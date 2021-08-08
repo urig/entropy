@@ -7,10 +7,12 @@ from typing import Set
 
 import jsonpickle
 import pandas as pd
-from alembic import command
+from alembic import command, script
 from alembic.config import Config
+from alembic.runtime import migration
 from pandas import DataFrame
 from sqlalchemy import create_engine, desc
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import Selectable
@@ -51,7 +53,7 @@ from entropylab.results_backend.sqlalchemy.model import (
     ResultTable,
     DebugTable,
     MetadataTable,
-    NodeTable,
+    NodeTable, Base,
 )
 
 _SQL_ALCHEMY_MEMORY = ":memory:"
@@ -69,6 +71,49 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
      and DataReader) and lab resources (PersistentLabDB)
     """
 
+    @staticmethod
+    def update_db(path: str = None) -> None:
+        config_location = SqlAlchemyDB.__abs_path_to("alembic.ini")
+        script_location = SqlAlchemyDB.__abs_path_to("alembic")
+        alembic_cfg = Config(config_location)
+        alembic_cfg.set_main_option('script_location', script_location)
+        alembic_cfg.set_main_option('sqlalchemy.url', path)
+        command.upgrade(alembic_cfg, 'head')
+
+    @staticmethod
+    def __abs_path_to(rel_path: str) -> str:
+        source_path = Path(__file__).resolve()
+        source_dir = source_path.parent
+        return os.path.join(source_dir, rel_path)
+
+    @staticmethod
+    def __create_parent_dirs(path) -> None:
+        dirname = os.path.dirname(path)
+        if dirname and dirname != "" and dirname != ".":
+            os.makedirs(dirname, exist_ok=True)
+
+    @staticmethod
+    def __ensure_migrations(engine: Engine) -> None:
+        if SqlAlchemyDB.__db_is_empty(engine):
+            SqlAlchemyDB.update_db(str(engine.url))
+        elif not SqlAlchemyDB.__db_is_up_to_date(engine):
+            raise Exception('Database is not up-to-date. Upgrade the database using update_db().')
+
+    @staticmethod
+    def __db_is_empty(engine: Engine) -> bool:
+        cursor = engine.execute("SELECT sql FROM sqlite_master WHERE type = 'table'")
+        return len(cursor.fetchall()) == 0
+
+    @staticmethod
+    def __db_is_up_to_date(engine: Engine) -> bool:
+        script_location = SqlAlchemyDB.__abs_path_to("alembic")
+        script_ = script.ScriptDirectory(script_location)
+        with engine.begin() as conn:
+            context = migration.MigrationContext.configure(conn)
+            db_version = context.get_current_revision()
+            latest_version = script_.get_current_head()
+            return db_version == latest_version
+
     def __init__(self, path=None, echo=False):
         """
             Database implementation using SqlAlchemy package for results (DataWriter
@@ -79,28 +124,16 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         super(SqlAlchemyDB, self).__init__()
         if path is None:
             path = _SQL_ALCHEMY_MEMORY
+        dsn = "sqlite:///" + path
+        if path == _SQL_ALCHEMY_MEMORY:
+            self._engine = create_engine(dsn, echo=echo)
+            Base.metadata.create_all(self._engine)
+            self._Session = sessionmaker(bind=self._engine)
         else:
-            if path != _SQL_ALCHEMY_MEMORY:
-                dirname = os.path.dirname(path)
-                if dirname and dirname != "":
-                    os.makedirs(dirname, exist_ok=True)
-        path = "sqlite:///" + path
-        self.__run_migrations(path)
-        self._engine = create_engine(path, echo=echo)
-        self._Session = sessionmaker(bind=self._engine)
-
-    def __run_migrations(self, dsn: str) -> None:
-        config_location = self.__abs_path_to("alembic.ini")
-        script_location = self.__abs_path_to("alembic")
-        alembic_cfg = Config(config_location)
-        alembic_cfg.set_main_option('script_location', script_location)
-        alembic_cfg.set_main_option('sqlalchemy.url', dsn)
-        command.upgrade(alembic_cfg, 'head')
-
-    def __abs_path_to(self, rel_path: str):
-        source_path = Path(__file__).resolve()
-        source_dir = source_path.parent
-        return os.path.join(source_dir, rel_path)
+            self.__create_parent_dirs(path)
+            self._engine = create_engine(dsn, echo=echo)
+            self.__ensure_migrations(self._engine)
+            self._Session = sessionmaker(bind=self._engine)
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
         transaction = ExperimentTable.from_initial_data(initial_data)
@@ -110,8 +143,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ExperimentTable)
-                .filter(ExperimentTable.id == int(experiment_id))
-                .one_or_none()
+                    .filter(ExperimentTable.id == int(experiment_id))
+                    .one_or_none()
             )
             if query:
                 query.end_time = end_data.end_time
@@ -162,18 +195,18 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ExperimentTable)
-                .filter(ExperimentTable.id == int(experiment_id))
-                .one_or_none()
+                    .filter(ExperimentTable.id == int(experiment_id))
+                    .one_or_none()
             )
             if query:
                 return query.to_record()
 
     def get_experiments(
-        self,
-        label: Optional[str] = None,
-        start_after: Optional[datetime] = None,
-        end_after: Optional[datetime] = None,
-        success: Optional[bool] = None,
+            self,
+            label: Optional[str] = None,
+            start_after: Optional[datetime] = None,
+            end_after: Optional[datetime] = None,
+            success: Optional[bool] = None,
     ) -> Iterable[ExperimentRecord]:
         with self._session_maker() as sess:
             query = sess.query(ExperimentTable)
@@ -188,13 +221,13 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             return [item.to_record() for item in query.all()]
 
     def get_results(
-        self,
-        experiment_id: Optional[int] = None,
-        label: Optional[str] = None,
-        stage: Optional[int] = None,
+            self,
+            experiment_id: Optional[int] = None,
+            label: Optional[str] = None,
+            stage: Optional[int] = None,
     ) -> Iterable[ResultRecord]:
         if not _HDF5_RESULTS_DB:
-            return self.__get_results_from_sqlalchemy(experiment_id, label,stage)
+            return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
         else:
             results_from_sql_alchemy = self.__get_results_from_sqlalchemy(experiment_id, label, stage, False)
             sqlalchemy_ids = ResultsDB().migrate_result_records(results_from_sql_alchemy)
@@ -203,11 +236,11 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         pass
 
     def __get_results_from_sqlalchemy(
-        self,
-        experiment_id: Optional[int] = None,
-        label: Optional[str] = None,
-        stage: Optional[int] = None,
-        saved_in_hdf5: Optional[bool] = None
+            self,
+            experiment_id: Optional[int] = None,
+            label: Optional[str] = None,
+            stage: Optional[int] = None,
+            saved_in_hdf5: Optional[bool] = None
     ) -> Iterable[ResultRecord]:
         with self._session_maker() as sess:
             query = sess.query(ResultTable)
@@ -223,16 +256,16 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
 
     def __mark_results_as_migrated(self, result_record_ids: list[int]):
         with self._session_maker() as sess:
-            sess.query(ResultTable)\
-                .filter(ResultTable.id.in_(result_record_ids))\
+            sess.query(ResultTable) \
+                .filter(ResultTable.id.in_(result_record_ids)) \
                 .update({'saved_in_hdf5': True})
             sess.commit()
 
     def get_metadata_records(
-        self,
-        experiment_id: Optional[int] = None,
-        label: Optional[str] = None,
-        stage: Optional[int] = None,
+            self,
+            experiment_id: Optional[int] = None,
+            label: Optional[str] = None,
+            stage: Optional[int] = None,
     ) -> Iterable[MetadataRecord]:
         with self._session_maker() as sess:
             query = sess.query(MetadataTable)
@@ -248,8 +281,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(MetadataTable)
-                .filter(DebugTable.experiment_id == int(experiment_id))
-                .one_or_none()
+                    .filter(DebugTable.experiment_id == int(experiment_id))
+                    .one_or_none()
             )
             if query:
                 return query.to_record()
@@ -258,8 +291,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResultTable)
-                .filter(ResultTable.experiment_id == int(exp_id))
-                .filter(ResultTable.label == name)
+                    .filter(ResultTable.experiment_id == int(exp_id))
+                    .filter(ResultTable.label == name)
             )
             return self._query_pandas(query)
 
@@ -267,15 +300,15 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(PlotTable)
-                .filter(PlotTable.experiment_id == int(experiment_id))
-                .all()
+                    .filter(PlotTable.experiment_id == int(experiment_id))
+                    .all()
             )
             if query:
                 return [plot.to_record() for plot in query]
         return []
 
     def get_nodes_id_by_label(
-        self, label: str, experiment_id: Optional[int] = None
+            self, label: str, experiment_id: Optional[int] = None
     ) -> List[int]:
         with self._session_maker() as sess:
             query = sess.query(NodeTable).filter(NodeTable.label == label)
@@ -288,14 +321,14 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         return []
 
     def get_last_result_of_experiment(
-        self, experiment_id: int
+            self, experiment_id: int
     ) -> Optional[ResultRecord]:
         with self._session_maker() as sess:
             query = (
                 sess.query(ResultTable)
-                .filter(ResultTable.experiment_id == int(experiment_id))
-                .order_by(desc(ResultTable.time))
-                .first()
+                    .filter(ResultTable.experiment_id == int(experiment_id))
+                    .order_by(desc(ResultTable.time))
+                    .first()
             )
             if query:
                 return query.to_record()
@@ -333,18 +366,18 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             session.close()
 
     def save_new_resource_driver(
-        self,
-        name: str,
-        driver_source_code: str,
-        module: str,
-        class_name: str,
-        serialized_args: str,
-        serialized_kwargs: str,
-        number_of_experiment_args: int,
-        keys_of_experiment_kwargs: List[str],
-        functions: List[Function],
-        parameters: List[Parameter],
-        undeclared_functions: List[Function],
+            self,
+            name: str,
+            driver_source_code: str,
+            module: str,
+            class_name: str,
+            serialized_args: str,
+            serialized_kwargs: str,
+            number_of_experiment_args: int,
+            keys_of_experiment_kwargs: List[str],
+            functions: List[Function],
+            parameters: List[Parameter],
+            undeclared_functions: List[Function],
     ):
         transaction = Resources(
             update_time=datetime.now(),
@@ -372,9 +405,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                .filter(Resources.name == name)
-                .order_by(desc(Resources.update_time))
-                .first()
+                    .filter(Resources.name == name)
+                    .order_by(desc(Resources.update_time))
+                    .first()
             )
             if query:
                 query.deleted = True
@@ -395,10 +428,10 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResourcesSnapshots)
-                .filter(ResourcesSnapshots.driver_id == driver_id)
-                .filter(ResourcesSnapshots.name == snapshot_name)
-                .order_by(desc(ResourcesSnapshots.update_time))
-                .first()
+                    .filter(ResourcesSnapshots.driver_id == driver_id)
+                    .filter(ResourcesSnapshots.name == snapshot_name)
+                    .order_by(desc(ResourcesSnapshots.update_time))
+                    .first()
             )
             if query:
                 return query.state
@@ -410,8 +443,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResourcesSnapshots)
-                .filter(ResourcesSnapshots.driver_id == driver_id)
-                .order_by(desc(ResourcesSnapshots.update_time))
+                    .filter(ResourcesSnapshots.driver_id == driver_id)
+                    .order_by(desc(ResourcesSnapshots.update_time))
             )
             return query.all()
 
@@ -419,9 +452,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                .filter(Resources.name == name)
-                .order_by(desc(Resources.update_time))
-                .first()
+                    .filter(Resources.name == name)
+                    .order_by(desc(Resources.update_time))
+                    .first()
             )
             if query and not query.deleted:
                 cached_metadata = jsonpickle.loads(query.cached_metadata)
@@ -445,9 +478,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                .filter(Resources.name == name)
-                .order_by(desc(Resources.update_time))
-                .first()
+                    .filter(Resources.name == name)
+                    .order_by(desc(Resources.update_time))
+                    .first()
             )
             if query and not query.deleted:
                 return int(query.id)
@@ -464,9 +497,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                .filter(Resources.deleted == False)  # noqa: E712
-                .group_by(Resources.name)
-                .all()
+                    .filter(Resources.deleted == False)  # noqa: E712
+                    .group_by(Resources.name)
+                    .all()
             )
             if query is not None:
                 return {item.name for item in query}
