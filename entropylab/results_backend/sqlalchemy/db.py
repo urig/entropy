@@ -12,7 +12,7 @@ from alembic.config import Config
 from alembic.runtime import migration
 from pandas import DataFrame
 from sqlalchemy import create_engine, desc
-from sqlalchemy.engine import Engine
+import sqlalchemy.engine
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import Selectable
@@ -43,6 +43,7 @@ from entropylab.instruments.lab_topology import (
     ResourceRecord,
 )
 from entropylab.results_backend.hdf5.results_db import ResultsDB
+from entropylab.results_backend.sqlalchemy.db_initializer import DbInitializer
 from entropylab.results_backend.sqlalchemy.lab_model import (
     Resources,
     ResourcesSnapshots,
@@ -53,7 +54,7 @@ from entropylab.results_backend.sqlalchemy.model import (
     ResultTable,
     DebugTable,
     MetadataTable,
-    NodeTable, Base,
+    NodeTable,
 )
 
 _SQL_ALCHEMY_MEMORY = ":memory:"
@@ -72,49 +73,12 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
     """
 
     @staticmethod
-    def update_db(path: str = None) -> None:
-        config_location = SqlAlchemyDB.__abs_path_to("alembic.ini")
-        script_location = SqlAlchemyDB.__abs_path_to("alembic")
-        alembic_cfg = Config(config_location)
-        alembic_cfg.set_main_option('script_location', script_location)
-        alembic_cfg.set_main_option('sqlalchemy.url', path)
-        command.upgrade(alembic_cfg, 'head')
-
-    @staticmethod
-    def __abs_path_to(rel_path: str) -> str:
-        source_path = Path(__file__).resolve()
-        source_dir = source_path.parent
-        return os.path.join(source_dir, rel_path)
-
-    @staticmethod
     def __create_parent_dirs(path) -> None:
         dirname = os.path.dirname(path)
         if dirname and dirname != "" and dirname != ".":
             os.makedirs(dirname, exist_ok=True)
 
-    @staticmethod
-    def __ensure_migrations(engine: Engine) -> None:
-        if SqlAlchemyDB.__db_is_empty(engine):
-            SqlAlchemyDB.update_db(str(engine.url))
-        elif not SqlAlchemyDB.__db_is_up_to_date(engine):
-            raise Exception('Database is not up-to-date. Upgrade the database using update_db().')
-
-    @staticmethod
-    def __db_is_empty(engine: Engine) -> bool:
-        cursor = engine.execute("SELECT sql FROM sqlite_master WHERE type = 'table'")
-        return len(cursor.fetchall()) == 0
-
-    @staticmethod
-    def __db_is_up_to_date(engine: Engine) -> bool:
-        script_location = SqlAlchemyDB.__abs_path_to("alembic")
-        script_ = script.ScriptDirectory(script_location)
-        with engine.begin() as conn:
-            context = migration.MigrationContext.configure(conn)
-            db_version = context.get_current_revision()
-            latest_version = script_.get_current_head()
-            return db_version == latest_version
-
-    def __init__(self, path=None, echo=False):
+    def __init__(self, path=_SQL_ALCHEMY_MEMORY, echo=False):
         """
             Database implementation using SqlAlchemy package for results (DataWriter
             and DataReader) and lab resources (PersistentLabDB)
@@ -122,18 +86,12 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         :param echo: if True, the database engine will log all statements
         """
         super(SqlAlchemyDB, self).__init__()
-        if path is None:
-            path = _SQL_ALCHEMY_MEMORY
-        dsn = "sqlite:///" + path
-        if path == _SQL_ALCHEMY_MEMORY:
-            self._engine = create_engine(dsn, echo=echo)
-            Base.metadata.create_all(self._engine)
-            self._Session = sessionmaker(bind=self._engine)
-        else:
+        if path != _SQL_ALCHEMY_MEMORY:
             self.__create_parent_dirs(path)
-            self._engine = create_engine(dsn, echo=echo)
-            self.__ensure_migrations(self._engine)
-            self._Session = sessionmaker(bind=self._engine)
+        dsn = "sqlite:///" + path
+        self._engine = create_engine(dsn, echo=echo)
+        self._Session = sessionmaker(bind=self._engine)
+        DbInitializer(self._engine).init_db()
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
         transaction = ExperimentTable.from_initial_data(initial_data)
