@@ -12,27 +12,27 @@ from entropylab.results_backend.sqlalchemy.model import ResultDataType
 HDF_FILENAME = "./entropy.hdf5"
 
 
-def experiment_from(dset: h5py.Dataset) -> int:
+def _experiment_from(dset: h5py.Dataset) -> int:
     return dset.attrs['experiment_id']
 
 
-def id_from(dset: h5py.Dataset) -> str:
+def _id_from(dset: h5py.Dataset) -> str:
     return dset.name
 
 
-def stage_from(dset: h5py.Dataset) -> int:
+def _stage_from(dset: h5py.Dataset) -> int:
     return dset.attrs['stage']
 
 
-def label_from(dset: h5py.Dataset) -> str:
+def _label_from(dset: h5py.Dataset) -> str:
     return dset.attrs['label']
 
 
-def story_from(dset: h5py.Dataset) -> str:
+def _story_from(dset: h5py.Dataset) -> str:
     return dset.attrs['story']
 
 
-def data_from(dset: h5py.Dataset) -> Any:
+def _data_from(dset: h5py.Dataset) -> Any:
     if dset.dtype.metadata is not None and dset.dtype.metadata.get('vlen') == str:
         return dset.asstr()[()]
     else:
@@ -43,33 +43,25 @@ def data_from(dset: h5py.Dataset) -> Any:
     return dset[()]
 
 
-def time_from(dset: h5py.Dataset) -> datetime:
+def _time_from(dset: h5py.Dataset) -> datetime:
     return datetime.fromisoformat(dset.attrs['time'])
-
-
-def build_raw_result_data(dset: h5py.Dataset) -> RawResultData:
-    return RawResultData(
-        stage=stage_from(dset),
-        label=label_from(dset),
-        data=data_from(dset),
-        story=story_from(dset))
 
 
 def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     return ResultRecord(
-        experiment_id=experiment_from(dset),
+        experiment_id=_experiment_from(dset),
         # TODO: How to generate a numeric id? Or refactor id to str?
         id=0,  # id_from(dset),
-        label=label_from(dset),
-        story=story_from(dset),
-        stage=stage_from(dset),
-        data=data_from(dset),
-        time=time_from(dset),
+        label=_label_from(dset),
+        story=_story_from(dset),
+        stage=_stage_from(dset),
+        data=_data_from(dset),
+        time=_time_from(dset),
         saved_in_hdf5=True  # assumes this method is only called after result is read from HDF5
     )
 
 
-def get_children_or_by_name(group: h5py.Group, name: Optional[str] = None):
+def _get_all_or_one(group: h5py.Group, name: Optional[str] = None):
     """
     Returns all or one child from an h5py.Group
 
@@ -157,12 +149,6 @@ class ResultsDB:
         dset.attrs.create('migrated_id', result_record.id or "")
         return dset.name
 
-    def read_result(self, experiment_id: int, stage: int, label: str) -> RawResultData:
-        with h5py.File(HDF_FILENAME, 'r') as file:
-            path = f"/{experiment_id}/{stage}/{label}"
-            dset = file.get(path)
-            return build_raw_result_data(dset)
-
     def get_results(
             self,
             experiment_id: Optional[int] = None,
@@ -170,28 +156,26 @@ class ResultsDB:
             label: Optional[str] = None,
     ) -> Iterable[ResultRecord]:
         """
-        Returns a list ResultRecords from HDF5.
+        Retrieves ResultRecords from HDF5.
         """
         result = []
         try:
             with h5py.File(HDF_FILENAME, 'r') as file:
                 if file is None:
                     return result
-                experiments = get_children_or_by_name(file, experiment_id)
+                experiments = _get_all_or_one(file, experiment_id)
                 for experiment in experiments:
-                    stages = get_children_or_by_name(experiment, stage)
+                    stages = _get_all_or_one(experiment, stage)
                     for stage in stages:
-                        dsets = get_children_or_by_name(stage, label)
+                        dsets = _get_all_or_one(stage, label)
                         for dset in dsets:
                             result.append(_build_result_record(dset))
         except FileNotFoundError:
             return result
         return result
 
-    def get_last_result_of_experiment(
-            self, experiment_id: int
-    ) -> Optional[ResultRecord]:
-        results = self.get_results(experiment_id, None, None)
+    def get_last_result_of_experiment(self, experiment_id: int) -> Optional[ResultRecord]:
+        results = list(self.get_results(experiment_id, None, None))
         if results:
             results.sort(key=lambda x: x.time, reverse=True)
             return results[0]
