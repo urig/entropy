@@ -1,4 +1,5 @@
 import logging
+import pickle
 from datetime import datetime
 from typing import Optional, Any, Iterable
 
@@ -6,6 +7,7 @@ import h5py
 
 from entropylab import RawResultData
 from entropylab.api.data_reader import ResultRecord
+from entropylab.results_backend.sqlalchemy.model import ResultDataType
 
 HDF_FILENAME = "./entropy.hdf5"
 
@@ -34,7 +36,11 @@ def data_from(dset: h5py.Dataset) -> Any:
     if dset.dtype.metadata is not None and dset.dtype.metadata.get('vlen') == str:
         return dset.asstr()[()]
     else:
-        return dset[()]
+        if dset.attrs.get('data_type') == ResultDataType.Pickled.value:
+            return pickle.loads(dset[()])
+        elif dset.attrs.get('data_type') == ResultDataType.String.value:
+            return dset[()].decode()
+    return dset[()]
 
 
 def time_from(dset: h5py.Dataset) -> datetime:
@@ -61,10 +67,6 @@ def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
         time=time_from(dset),
         saved_in_hdf5=True  # assumes this method is only called after result is read from HDF5
     )
-
-
-def build_key(dset: h5py.Dataset) -> (int, int, str):
-    return experiment_from(dset), stage_from(dset), label_from(dset)
 
 
 def get_children_or_by_name(group: h5py.Group, name: Optional[str] = None):
@@ -99,15 +101,32 @@ class ResultsDB:
         with h5py.File(HDF_FILENAME, 'a') as file:
             path = f"/{experiment_id}/{result.stage}"
             group = file.require_group(path)
-            dset = group.create_dataset(
-                name=result.label,
-                data=result.data)
+            dset = self.__create_dataset(group, result.label, result.data)
             dset.attrs.create('experiment_id', experiment_id)
             dset.attrs.create('stage', result.stage)
             dset.attrs.create('label', result.label or "")
             dset.attrs.create('story', result.story or "")
             dset.attrs.create('time', datetime.now().astimezone().isoformat())
             return dset.name
+
+    def __create_dataset(self, group: h5py.Group, name: str, data: Any) -> h5py.Dataset:
+        try:
+            dset = group.create_dataset(name=name, data=data)
+        except TypeError:
+            data_type, pickled = self.__pickle_data(data)
+            dtype = h5py.string_dtype(encoding='ascii', length=len(pickled))
+            dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
+            dset.attrs.create('data_type', data_type.value, dtype='i2')
+        return dset
+
+    def __pickle_data(self, data: Any):
+        try:
+            pickled = pickle.dumps(data)
+            data_type = ResultDataType.Pickled
+        except Exception:
+            pickled = data.__repr__().encode(encoding="UTF-8")
+            data_type = ResultDataType.String
+        return data_type, pickled
 
     def migrate_result_records(self, result_records: Iterable[ResultRecord]) -> list[int]:
         if result_records is None:
@@ -170,7 +189,7 @@ class ResultsDB:
         return result
 
     def get_last_result_of_experiment(
-        self, experiment_id: int
+            self, experiment_id: int
     ) -> Optional[ResultRecord]:
         results = self.get_results(experiment_id, None, None)
         if results:

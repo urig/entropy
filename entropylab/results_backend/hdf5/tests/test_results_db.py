@@ -8,12 +8,32 @@ import pytest
 
 from entropylab import RawResultData
 from entropylab.results_backend.hdf5.results_db import ResultsDB, HDF_FILENAME, get_children_or_by_name
+from entropylab.results_backend.sqlalchemy.model import ResultDataType
+
+
+class Picklable(object):
+    def __init__(self, foo):
+        self.foo = foo
+
+    def __eq__(self, obj):
+        return isinstance(obj, Picklable) and obj.foo == self.foo
+
+
+class UnPicklable(object):
+
+    def __init__(self, foo):
+        self.foo = foo
+        self.baz = lambda: print("You can't pickle me")
+
+    def __eq__(self, obj):
+        return isinstance(obj, Picklable) and obj.foo == self.foo
 
 
 @pytest.mark.parametrize(
     "data", [
-        42, True, 3.14159265359, -160000000000000, np.int64(42), "foo",
-        [1, 2, 3], np.arange(12), ["foo", "bar", "baz"], (42, 2), (42, "foo"), {"foo": "bar"}
+        42, True, 3.14159265359, -160000000000000, np.int64(42), "foo", [1, 2, 3], np.arange(12),
+        ["foo", "bar", "baz"], (42, 2), (42, "foo"), {"foo": "bar"}, ResultDataType.String,
+        Picklable("bar"), UnPicklable("bar")
     ])
 def test_write_and_read_single_result(data: Any):
     target = ResultsDB()
@@ -33,12 +53,13 @@ def test_write_and_read_single_result(data: Any):
             assert_lists_are_equal(actual.data, data)
         elif isinstance(data, np.ndarray):
             assert_lists_are_equal(actual.data, data)
+        elif isinstance(data, UnPicklable):
+            assert str(actual.data).startswith("<entropylab.results_backend.hdf5.tests.test_results_db.UnPicklable")
         else:
             assert actual.data == data
 
     finally:
         # clean up
-        # filename = target._ResultsDB__get_filename(experiment_id)
         os.remove(HDF_FILENAME)
 
 
@@ -55,7 +76,7 @@ def test_get_results_two_results():
         target.save_result(experiment_id, result2)
 
         # act
-        actual = target.get_results(experiment_id, result.stage)
+        actual = list(target.get_results(experiment_id, result.stage))
 
         # assert
         assert len(actual) == 2
