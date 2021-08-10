@@ -78,7 +78,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if dirname and dirname != "" and dirname != ".":
             os.makedirs(dirname, exist_ok=True)
 
-    def __init__(self, path=_SQL_ALCHEMY_MEMORY, echo=False):
+    def __init__(self, path=None, echo=False):
         """
             Database implementation using SqlAlchemy package for results (DataWriter
             and DataReader) and lab resources (PersistentLabDB)
@@ -86,6 +86,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         :param echo: if True, the database engine will log all statements
         """
         super(SqlAlchemyDB, self).__init__()
+        if path is None:
+            path = _SQL_ALCHEMY_MEMORY
         if path != _SQL_ALCHEMY_MEMORY:
             self.__create_parent_dirs(path)
         dsn = "sqlite:///" + path
