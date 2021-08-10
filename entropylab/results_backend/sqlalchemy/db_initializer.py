@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -5,8 +6,10 @@ import sqlalchemy.engine
 from alembic import script, command
 from alembic.config import Config
 from alembic.runtime import migration
+from sqlalchemy.orm import sessionmaker
 
-from entropylab.results_backend.sqlalchemy.model import Base
+from entropylab.results_backend.hdf5.results_db import ResultsDB
+from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
 
 
 class DbInitializer:
@@ -53,4 +56,22 @@ class DbInitializer:
         command.upgrade(alembic_cfg, 'head')
 
     def _migrate_results_to_hdf5(self):
-        pass
+        logging.debug("Migrating results from sqlite to hdf5")
+        results_db = ResultsDB()
+        session_maker = sessionmaker(bind=self._engine)
+        with session_maker() as session:
+            results = session \
+                .query(ResultTable) \
+                .filter(ResultTable.saved_in_hdf5.is_(False)) \
+                .all()
+            if len(results) == 0:
+                logging.debug("No results need migrating. Done")
+            else:
+                logging.debug(f"Found {len(results)} results to migrate")
+                result_records = list(map(lambda r: r.to_record(), results))
+                migrated_ids = results_db.migrate_result_records(result_records)
+                logging.debug(f"Migrated {len(migrated_ids)} to hdf5")
+                for result in results:
+                    result.saved_in_hdf5 = True
+                session.commit()
+                logging.debug("Marked results in sqlite as `saved_in_hdf5`. Done")

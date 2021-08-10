@@ -1,18 +1,13 @@
 import logging
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import List, TypeVar, Optional, ContextManager, Iterable, Union, Any
 from typing import Set
 
 import jsonpickle
 import pandas as pd
-from alembic import command, script
-from alembic.config import Config
-from alembic.runtime import migration
 from pandas import DataFrame
 from sqlalchemy import create_engine, desc
-import sqlalchemy.engine
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import Selectable
@@ -62,8 +57,6 @@ T = TypeVar(
     "T",
 )
 
-_HDF5_RESULTS_DB = True
-
 
 # noinspection PyBroadException
 class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
@@ -71,6 +64,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
     Database implementation using SqlAlchemy package for results (DataWriter
      and DataReader) and lab resources (PersistentLabDB)
     """
+
+    __SAVE_RESULTS_IN_HDF5 = True
 
     @staticmethod
     def __create_parent_dirs(path) -> None:
@@ -117,7 +112,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if result.label == "":
             raise ValueError("result.label cannot be empty")
         saved_in_hdf5 = False
-        if _HDF5_RESULTS_DB:
+        if self.__SAVE_RESULTS_IN_HDF5:
             try:
                 ResultsDB().save_result(experiment_id, result)
                 saved_in_hdf5 = True
@@ -186,7 +181,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             label: Optional[str] = None,
             stage: Optional[int] = None,
     ) -> Iterable[ResultRecord]:
-        if not _HDF5_RESULTS_DB:
+        if not self.__SAVE_RESULTS_IN_HDF5:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
         else:
             return ResultsDB().get_results(experiment_id, stage, label)
@@ -207,16 +202,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
                 query = query.filter(ResultTable.label == str(label))
             if stage is not None:
                 query = query.filter(ResultTable.stage == int(stage))
-            if _HDF5_RESULTS_DB and saved_in_hdf5 is not None:
+            if self.__SAVE_RESULTS_IN_HDF5 and saved_in_hdf5 is not None:
                 query = query.filter(ResultTable.saved_in_hdf5 == bool(saved_in_hdf5))
             return [item.to_record() for item in query.all()]
-
-    def __mark_results_as_migrated(self, result_record_ids: list[int]):
-        with self._session_maker() as sess:
-            sess.query(ResultTable) \
-                .filter(ResultTable.id.in_(result_record_ids)) \
-                .update({'saved_in_hdf5': True})
-            sess.commit()
 
     def get_metadata_records(
             self,
