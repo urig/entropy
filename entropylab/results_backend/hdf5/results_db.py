@@ -163,13 +163,13 @@ class ResultsDB:
             with h5py.File(HDF_FILENAME, 'r') as file:
                 if file is None:
                     return result
-                experiments = _get_all_or_one(file, experiment_id)
-                for experiment in experiments:
-                    stages = _get_all_or_one(experiment, stage)
-                    for stage in stages:
-                        dsets = _get_all_or_one(stage, label)
-                        for dset in dsets:
-                            result.append(_build_result_record(dset))
+                exp_groups = _get_all_or_one(file, experiment_id)
+                for exp_group in exp_groups:
+                    stage_groups = _get_all_or_one(exp_group, stage)
+                    for stage_group in stage_groups:
+                        label_dsets = _get_all_or_one(stage_group, label)
+                        for label_dset in label_dsets:
+                            result.append(_build_result_record(label_dset))
         except FileNotFoundError:
             return result
         return result
