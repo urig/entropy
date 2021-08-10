@@ -189,9 +189,6 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if not _HDF5_RESULTS_DB:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
         else:
-            results_from_sql_alchemy = self.__get_results_from_sqlalchemy(experiment_id, label, stage, False)
-            sqlalchemy_ids = ResultsDB().migrate_result_records(results_from_sql_alchemy)
-            self.__mark_results_as_migrated(sqlalchemy_ids)
             return ResultsDB().get_results(experiment_id, stage, label)
         pass
 
