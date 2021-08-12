@@ -2,7 +2,7 @@ import os
 
 import entropylab
 from entropylab import SqlAlchemyDB, RawResultData
-from entropylab.results_backend.hdf5.results_db import HDF_FILENAME, ResultsDB
+from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, ResultsDB
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
 

@@ -8,7 +8,7 @@ from alembic.config import Config
 from alembic.runtime import migration
 from sqlalchemy.orm import sessionmaker
 
-from entropylab.results_backend.hdf5.results_db import ResultsDB
+from entropylab.results_backend.sqlalchemy.results_db import ResultsDB
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
 
 

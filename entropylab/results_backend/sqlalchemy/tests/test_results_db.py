@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from entropylab import RawResultData
-from entropylab.results_backend.hdf5.results_db import ResultsDB, HDF_FILENAME, _get_all_or_single
+from entropylab.results_backend.sqlalchemy.results_db import ResultsDB, HDF_FILENAME, _get_all_or_single
 from entropylab.results_backend.sqlalchemy.model import ResultDataType
 
 

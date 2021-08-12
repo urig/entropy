@@ -37,7 +37,7 @@ from entropylab.instruments.lab_topology import (
     DriverType,
     ResourceRecord,
 )
-from entropylab.results_backend.hdf5.results_db import ResultsDB
+from entropylab.results_backend.sqlalchemy.results_db import ResultsDB
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 from entropylab.results_backend.sqlalchemy.lab_model import (
     Resources,

@@ -84,7 +84,6 @@ def _get_all_or_single(group: h5py.Group, name: Optional[str] = None):
             return []
 
 
-# TODO: Move under results_backend/sqlalchemy
 # noinspection PyMethodMayBeStatic,PyBroadException
 class ResultsDB:
 
@@ -178,7 +177,6 @@ class ResultsDB:
             return result
 
     def get_last_result_of_experiment(self, experiment_id: int) -> Optional[ResultRecord]:
-        # TODO: Does h5py give search/index for attrs?
         results = list(self.get_results(experiment_id, None, None))
         if results and len(results) > 0:
             results.sort(key=lambda x: x.time, reverse=True)
