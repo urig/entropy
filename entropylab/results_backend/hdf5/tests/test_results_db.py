@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from entropylab import RawResultData
-from entropylab.results_backend.hdf5.results_db import ResultsDB, HDF_FILENAME, _get_all_or_one
+from entropylab.results_backend.hdf5.results_db import ResultsDB, HDF_FILENAME, _get_all_or_single
 from entropylab.results_backend.sqlalchemy.model import ResultDataType
 
 
@@ -154,7 +154,7 @@ def test_get_children_or_by_name_when_label_is_not_specified(request):
             file.create_dataset("foo", data=42)
             file.create_dataset("bar", data=-3.1412)
             # act
-            actual = _get_all_or_one(file)
+            actual = _get_all_or_single(file)
             # assert
             assert len(actual) == 2
             names = list(map(lambda d: d.name, actual))
@@ -172,7 +172,7 @@ def test_get_children_or_by_name_when_label_is_specified(request):
         with h5py.File(filename, 'w') as file:
             file.create_dataset("foo", data=42)
             # act
-            actual = _get_all_or_one(file, "foo")
+            actual = _get_all_or_single(file, "foo")
             # assert
             assert len(actual) == 1
             assert actual[0].name == "/foo"
@@ -188,7 +188,7 @@ def test_get_children_or_by_name_when_label_is_not_in_group(request):
         with h5py.File(filename, 'w') as file:
             file.create_dataset("foo", data=42)
             # act
-            actual = _get_all_or_one(file, "bar")
+            actual = _get_all_or_single(file, "bar")
             # assert
             assert len(actual) == 0
     finally:
@@ -202,7 +202,7 @@ def test_get_children_or_by_name_when_group_is_empty(request):
         # arrange
         with h5py.File(filename, 'w') as file:
             # act
-            actual = _get_all_or_one(file)
+            actual = _get_all_or_single(file)
             # assert
             assert len(actual) == 0
     finally:

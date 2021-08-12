@@ -33,14 +33,16 @@ def _story_from(dset: h5py.Dataset) -> str:
 
 
 def _data_from(dset: h5py.Dataset) -> Any:
-    if dset.dtype.metadata is not None and dset.dtype.metadata.get('vlen') == str:
+    data = dset[()]
+    if dset.dtype.metadata and dset.dtype.metadata.get('vlen') == str:
         return dset.asstr()[()]
+    elif dset.attrs.get('data_type') == ResultDataType.Pickled.value:
+        return pickle.loads(data)
+    elif dset.attrs.get('data_type') == ResultDataType.String.value:
+        # TODO: Prove this works with a test
+        return data.decode()
     else:
-        if dset.attrs.get('data_type') == ResultDataType.Pickled.value:
-            return pickle.loads(dset[()])
-        elif dset.attrs.get('data_type') == ResultDataType.String.value:
-            return dset[()].decode()
-    return dset[()]
+        return data
 
 
 def _time_from(dset: h5py.Dataset) -> datetime:
@@ -50,18 +52,17 @@ def _time_from(dset: h5py.Dataset) -> datetime:
 def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     return ResultRecord(
         experiment_id=_experiment_from(dset),
-        # TODO: How to generate a numeric id? Or refactor id to str?
+        # TODO: Get confirmation to change id to string + uniqueness of (exp, stg, lbl) combination
         id=0,  # id_from(dset),
         label=_label_from(dset),
         story=_story_from(dset),
         stage=_stage_from(dset),
         data=_data_from(dset),
         time=_time_from(dset),
-        saved_in_hdf5=True  # assumes this method is only called after result is read from HDF5
     )
 
 
-def _get_all_or_one(group: h5py.Group, name: Optional[str] = None):
+def _get_all_or_single(group: h5py.Group, name: Optional[str] = None):
     """
     Returns all or one child from an h5py.Group
 
@@ -83,6 +84,7 @@ def _get_all_or_one(group: h5py.Group, name: Optional[str] = None):
             return []
 
 
+# TODO: Move under results_backend/sqlalchemy
 # noinspection PyMethodMayBeStatic,PyBroadException
 class ResultsDB:
 
@@ -131,11 +133,13 @@ class ResultsDB:
                     try:
                         hdf5_id = self.__migrate_result_record(file, result_record)
                         sqlalchemy_ids.append(result_record.id)
+                        # TODO: switch to entropy.logging
                         logging.debug(f"Migrated result with id [{result_record.id}] to HDF5 with id [{hdf5_id}]")
                     except Exception:
                         logging.exception(f"Failed to migrate result with id [{result_record.id}] to HDF5")
             return sqlalchemy_ids
 
+    # TODO: Change from ResultRecord to RecordTable
     def __migrate_result_record(self, file: h5py.File, result_record: ResultRecord) -> str:
         path = f"/{result_record.experiment_id}/{result_record.stage}"
         group = file.require_group(path)
@@ -162,22 +166,21 @@ class ResultsDB:
         result = []
         try:
             with h5py.File(HDF_FILENAME, 'r') as file:
-                if file is None:
-                    return result
-                exp_groups = _get_all_or_one(file, experiment_id)
+                exp_groups = _get_all_or_single(file, experiment_id)
                 for exp_group in exp_groups:
-                    stage_groups = _get_all_or_one(exp_group, stage)
+                    stage_groups = _get_all_or_single(exp_group, stage)
                     for stage_group in stage_groups:
-                        label_dsets = _get_all_or_one(stage_group, label)
+                        label_dsets = _get_all_or_single(stage_group, label)
                         for label_dset in label_dsets:
                             result.append(_build_result_record(label_dset))
+            return result
         except FileNotFoundError:
             return result
-        return result
 
     def get_last_result_of_experiment(self, experiment_id: int) -> Optional[ResultRecord]:
+        # TODO: Does h5py give search/index for attrs?
         results = list(self.get_results(experiment_id, None, None))
-        if results:
+        if results and len(results) > 0:
             results.sort(key=lambda x: x.time, reverse=True)
             return results[0]
         else:
