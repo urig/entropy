@@ -46,7 +46,7 @@ def test_write_and_read_single_result(data: Any):
 
         # act
         target.save_result(experiment_id, result)
-        actual = target.get_results(experiment_id, result.stage, result.label)[0]
+        actual = list(target.get_results(experiment_id, result.stage, result.label))[0]
 
         # assert
         if isinstance(data, list) or isinstance(data, tuple):
@@ -54,7 +54,8 @@ def test_write_and_read_single_result(data: Any):
         elif isinstance(data, np.ndarray):
             assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
-            assert str(actual.data).startswith("<entropylab.results_backend.hdf5.tests.test_results_db.UnPicklable")
+            assert str(actual.data).startswith(
+                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable")
         else:
             assert actual.data == data
 

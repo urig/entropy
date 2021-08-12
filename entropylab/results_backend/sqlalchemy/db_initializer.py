@@ -20,7 +20,7 @@ class _DbInitializer:
     def validate_db(self) -> None:
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
-            # TODO: Stamp with alembic
+            self._alembic_stamp_head()
         elif not self._db_is_up_to_date():
             raise Exception('Database is not up-to-date. Upgrade the database using DbInitializer\'s update_db() '
                             'method.')
@@ -50,12 +50,20 @@ class _DbInitializer:
         self._migrate_results_to_hdf5()
 
     def _alembic_upgrade(self) -> None:
+        alembic_cfg = self._alembic_build_config()
+        command.upgrade(alembic_cfg, 'head')
+
+    def _alembic_stamp_head(self) -> None:
+        alembic_cfg = self._alembic_build_config()
+        command.stamp(alembic_cfg, 'head')
+
+    def _alembic_build_config(self) -> Config:
         config_location = self.__abs_path_to("alembic.ini")
         script_location = self.__abs_path_to("alembic")
         alembic_cfg = Config(config_location)
         alembic_cfg.set_main_option('script_location', script_location)
         alembic_cfg.set_main_option('sqlalchemy.url', str(self._engine.url))
-        command.upgrade(alembic_cfg, 'head')
+        return alembic_cfg
 
     def _migrate_results_to_hdf5(self):
         logging.debug("Migrating results from sqlite to hdf5")
