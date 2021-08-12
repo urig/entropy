@@ -87,6 +87,7 @@ def _get_all_or_one(group: h5py.Group, name: Optional[str] = None):
 class ResultsDB:
 
     def __init__(self):
+        # TODO: Validate hdf5 file access permissions here?
         pass
 
     def save_result(self, experiment_id: int, result: RawResultData) -> str:

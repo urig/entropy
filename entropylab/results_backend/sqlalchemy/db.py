@@ -38,7 +38,7 @@ from entropylab.instruments.lab_topology import (
     ResourceRecord,
 )
 from entropylab.results_backend.hdf5.results_db import ResultsDB
-from entropylab.results_backend.sqlalchemy.db_initializer import DbInitializer
+from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 from entropylab.results_backend.sqlalchemy.lab_model import (
     Resources,
     ResourcesSnapshots,
@@ -88,7 +88,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         dsn = "sqlite:///" + path
         self._engine = create_engine(dsn, echo=echo)
         self._Session = sessionmaker(bind=self._engine)
-        DbInitializer(self._engine).init_db()
+        _DbInitializer(self._engine).validate_db()
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
         transaction = ExperimentTable.from_initial_data(initial_data)

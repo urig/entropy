@@ -12,17 +12,18 @@ from entropylab.results_backend.hdf5.results_db import ResultsDB
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
 
 
-class DbInitializer:
+class _DbInitializer:
 
     def __init__(self, engine: sqlalchemy.engine.Engine):
         self._engine = engine
 
-    def init_db(self) -> None:
+    def validate_db(self) -> None:
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
             # TODO: Stamp with alembic
         elif not self._db_is_up_to_date():
-            raise Exception('Database is not up-to-date. Upgrade the database using update_db().')
+            raise Exception('Database is not up-to-date. Upgrade the database using DbInitializer\'s update_db() '
+                            'method.')
 
     def _db_is_empty(self) -> bool:
         cursor = self._engine.execute("SELECT sql FROM sqlite_master WHERE type = 'table'")
@@ -42,7 +43,8 @@ class DbInitializer:
         source_dir = source_path.parent
         return os.path.join(source_dir, rel_path)
 
-    def update_db(self) -> None:
+    # TODO: Hide behind module/db.py level function
+    def upgrade_db(self) -> None:
         # TODO: Test that this doesn't blow up when in memory
         self._alembic_upgrade()
         self._migrate_results_to_hdf5()
