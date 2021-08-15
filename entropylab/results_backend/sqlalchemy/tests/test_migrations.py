@@ -7,11 +7,7 @@ import pytest
 from entropylab import SqlAlchemyDB
 
 
-@pytest.mark.parametrize(
-    "path", [
-        None,
-        ":memory:"
-    ])
+@pytest.mark.parametrize("path", [None, ":memory:"])
 def test_ctor_creates_up_to_date_schema_when_in_memory(path: str):
     # act
     target = SqlAlchemyDB(path=path, echo=True)
@@ -22,12 +18,14 @@ def test_ctor_creates_up_to_date_schema_when_in_memory(path: str):
 
 
 @pytest.mark.parametrize(
-    "db_template, expected_to_throw", [
+    "db_template, expected_to_throw",
+    [
         (None, False),  # new db
         ("db_templates/empty.db", False),  # existing but empty
         ("db_templates/initial.db", True),  # revision 1318a586f31d
-        ("db_templates/with_saved_in_hdf5_col.db", False)  # revision 04ae19b32c08
-    ])
+        ("db_templates/with_saved_in_hdf5_col.db", False),  # revision 04ae19b32c08
+    ],
+)
 def test_ctor_ensures_latest_migration(db_template: str, expected_to_throw: bool):
     # arrange
     if db_template is not None:
@@ -53,6 +51,6 @@ def test_ctor_ensures_latest_migration(db_template: str, expected_to_throw: bool
 
 def get_test_file_name(filename):
     timestamp = f"{datetime.now():%Y-%m-%d-%H-%M-%S}"
-    return filename \
-        .replace("db_templates", "tests_cache") \
-        .replace(".db", f"_{timestamp}.db")
+    return filename.replace("db_templates", "tests_cache").replace(
+        ".db", f"_{timestamp}.db"
+    )

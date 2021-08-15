@@ -98,8 +98,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ExperimentTable)
-                    .filter(ExperimentTable.id == int(experiment_id))
-                    .one_or_none()
+                .filter(ExperimentTable.id == int(experiment_id))
+                .one_or_none()
             )
             if query:
                 query.end_time = end_data.end_time
@@ -150,18 +150,18 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ExperimentTable)
-                    .filter(ExperimentTable.id == int(experiment_id))
-                    .one_or_none()
+                .filter(ExperimentTable.id == int(experiment_id))
+                .one_or_none()
             )
             if query:
                 return query.to_record()
 
     def get_experiments(
-            self,
-            label: Optional[str] = None,
-            start_after: Optional[datetime] = None,
-            end_after: Optional[datetime] = None,
-            success: Optional[bool] = None,
+        self,
+        label: Optional[str] = None,
+        start_after: Optional[datetime] = None,
+        end_after: Optional[datetime] = None,
+        success: Optional[bool] = None,
     ) -> Iterable[ExperimentRecord]:
         with self._session_maker() as sess:
             query = sess.query(ExperimentTable)
@@ -176,10 +176,10 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             return [item.to_record() for item in query.all()]
 
     def get_results(
-            self,
-            experiment_id: Optional[int] = None,
-            label: Optional[str] = None,
-            stage: Optional[int] = None,
+        self,
+        experiment_id: Optional[int] = None,
+        label: Optional[str] = None,
+        stage: Optional[int] = None,
     ) -> Iterable[ResultRecord]:
         if not self.__SAVE_RESULTS_IN_HDF5:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
@@ -188,11 +188,11 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         pass
 
     def __get_results_from_sqlalchemy(
-            self,
-            experiment_id: Optional[int] = None,
-            label: Optional[str] = None,
-            stage: Optional[int] = None,
-            saved_in_hdf5: Optional[bool] = None
+        self,
+        experiment_id: Optional[int] = None,
+        label: Optional[str] = None,
+        stage: Optional[int] = None,
+        saved_in_hdf5: Optional[bool] = None,
     ) -> Iterable[ResultRecord]:
         with self._session_maker() as sess:
             query = sess.query(ResultTable)
@@ -207,10 +207,10 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             return [item.to_record() for item in query.all()]
 
     def get_metadata_records(
-            self,
-            experiment_id: Optional[int] = None,
-            label: Optional[str] = None,
-            stage: Optional[int] = None,
+        self,
+        experiment_id: Optional[int] = None,
+        label: Optional[str] = None,
+        stage: Optional[int] = None,
     ) -> Iterable[MetadataRecord]:
         with self._session_maker() as sess:
             query = sess.query(MetadataTable)
@@ -226,8 +226,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(MetadataTable)
-                    .filter(DebugTable.experiment_id == int(experiment_id))
-                    .one_or_none()
+                .filter(DebugTable.experiment_id == int(experiment_id))
+                .one_or_none()
             )
             if query:
                 return query.to_record()
@@ -236,8 +236,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResultTable)
-                    .filter(ResultTable.experiment_id == int(exp_id))
-                    .filter(ResultTable.label == name)
+                .filter(ResultTable.experiment_id == int(exp_id))
+                .filter(ResultTable.label == name)
             )
             return self._query_pandas(query)
 
@@ -245,15 +245,15 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(PlotTable)
-                    .filter(PlotTable.experiment_id == int(experiment_id))
-                    .all()
+                .filter(PlotTable.experiment_id == int(experiment_id))
+                .all()
             )
             if query:
                 return [plot.to_record() for plot in query]
         return []
 
     def get_nodes_id_by_label(
-            self, label: str, experiment_id: Optional[int] = None
+        self, label: str, experiment_id: Optional[int] = None
     ) -> List[int]:
         with self._session_maker() as sess:
             query = sess.query(NodeTable).filter(NodeTable.label == label)
@@ -266,14 +266,14 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         return []
 
     def get_last_result_of_experiment(
-            self, experiment_id: int
+        self, experiment_id: int
     ) -> Optional[ResultRecord]:
         with self._session_maker() as sess:
             query = (
                 sess.query(ResultTable)
-                    .filter(ResultTable.experiment_id == int(experiment_id))
-                    .order_by(desc(ResultTable.time))
-                    .first()
+                .filter(ResultTable.experiment_id == int(experiment_id))
+                .order_by(desc(ResultTable.time))
+                .first()
             )
             if query:
                 return query.to_record()
@@ -311,18 +311,18 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             session.close()
 
     def save_new_resource_driver(
-            self,
-            name: str,
-            driver_source_code: str,
-            module: str,
-            class_name: str,
-            serialized_args: str,
-            serialized_kwargs: str,
-            number_of_experiment_args: int,
-            keys_of_experiment_kwargs: List[str],
-            functions: List[Function],
-            parameters: List[Parameter],
-            undeclared_functions: List[Function],
+        self,
+        name: str,
+        driver_source_code: str,
+        module: str,
+        class_name: str,
+        serialized_args: str,
+        serialized_kwargs: str,
+        number_of_experiment_args: int,
+        keys_of_experiment_kwargs: List[str],
+        functions: List[Function],
+        parameters: List[Parameter],
+        undeclared_functions: List[Function],
     ):
         transaction = Resources(
             update_time=datetime.now(),
@@ -350,9 +350,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                    .filter(Resources.name == name)
-                    .order_by(desc(Resources.update_time))
-                    .first()
+                .filter(Resources.name == name)
+                .order_by(desc(Resources.update_time))
+                .first()
             )
             if query:
                 query.deleted = True
@@ -373,10 +373,10 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResourcesSnapshots)
-                    .filter(ResourcesSnapshots.driver_id == driver_id)
-                    .filter(ResourcesSnapshots.name == snapshot_name)
-                    .order_by(desc(ResourcesSnapshots.update_time))
-                    .first()
+                .filter(ResourcesSnapshots.driver_id == driver_id)
+                .filter(ResourcesSnapshots.name == snapshot_name)
+                .order_by(desc(ResourcesSnapshots.update_time))
+                .first()
             )
             if query:
                 return query.state
@@ -388,8 +388,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(ResourcesSnapshots)
-                    .filter(ResourcesSnapshots.driver_id == driver_id)
-                    .order_by(desc(ResourcesSnapshots.update_time))
+                .filter(ResourcesSnapshots.driver_id == driver_id)
+                .order_by(desc(ResourcesSnapshots.update_time))
             )
             return query.all()
 
@@ -397,9 +397,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                    .filter(Resources.name == name)
-                    .order_by(desc(Resources.update_time))
-                    .first()
+                .filter(Resources.name == name)
+                .order_by(desc(Resources.update_time))
+                .first()
             )
             if query and not query.deleted:
                 cached_metadata = jsonpickle.loads(query.cached_metadata)
@@ -423,9 +423,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                    .filter(Resources.name == name)
-                    .order_by(desc(Resources.update_time))
-                    .first()
+                .filter(Resources.name == name)
+                .order_by(desc(Resources.update_time))
+                .first()
             )
             if query and not query.deleted:
                 return int(query.id)
@@ -442,9 +442,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         with self._session_maker() as sess:
             query = (
                 sess.query(Resources)
-                    .filter(Resources.deleted == False)  # noqa: E712
-                    .group_by(Resources.name)
-                    .all()
+                .filter(Resources.deleted == False)  # noqa: E712
+                .group_by(Resources.name)
+                .all()
             )
             if query is not None:
                 return {item.name for item in query}

@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 
@@ -8,12 +7,12 @@ from alembic.config import Config
 from alembic.runtime import migration
 from sqlalchemy.orm import sessionmaker
 
+from entropylab.logger import logger
 from entropylab.results_backend.sqlalchemy.results_db import ResultsDB
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
 
 
 class _DbInitializer:
-
     def __init__(self, engine: sqlalchemy.engine.Engine):
         self._engine = engine
 
@@ -22,11 +21,15 @@ class _DbInitializer:
             Base.metadata.create_all(self._engine)
             self._alembic_stamp_head()
         elif not self._db_is_up_to_date():
-            raise Exception('Database is not up-to-date. Upgrade the database using DbInitializer\'s update_db() '
-                            'method.')
+            raise Exception(
+                "Database is not up-to-date. Upgrade the database using "
+                "DbInitializer's update_db() method."
+            )
 
     def _db_is_empty(self) -> bool:
-        cursor = self._engine.execute("SELECT sql FROM sqlite_master WHERE type = 'table'")
+        cursor = self._engine.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table'"
+        )
         return len(cursor.fetchall()) == 0
 
     def _db_is_up_to_date(self) -> bool:
@@ -51,37 +54,38 @@ class _DbInitializer:
 
     def _alembic_upgrade(self) -> None:
         alembic_cfg = self._alembic_build_config()
-        command.upgrade(alembic_cfg, 'head')
+        command.upgrade(alembic_cfg, "head")
 
     def _alembic_stamp_head(self) -> None:
         alembic_cfg = self._alembic_build_config()
-        command.stamp(alembic_cfg, 'head')
+        command.stamp(alembic_cfg, "head")
 
     def _alembic_build_config(self) -> Config:
         config_location = self.__abs_path_to("alembic.ini")
         script_location = self.__abs_path_to("alembic")
         alembic_cfg = Config(config_location)
-        alembic_cfg.set_main_option('script_location', script_location)
-        alembic_cfg.set_main_option('sqlalchemy.url', str(self._engine.url))
+        alembic_cfg.set_main_option("script_location", script_location)
+        alembic_cfg.set_main_option("sqlalchemy.url", str(self._engine.url))
         return alembic_cfg
 
     def _migrate_results_to_hdf5(self):
-        logging.debug("Migrating results from sqlite to hdf5")
+        logger.debug("Migrating results from sqlite to hdf5")
         results_db = ResultsDB()
         session_maker = sessionmaker(bind=self._engine)
         with session_maker() as session:
-            results = session \
-                .query(ResultTable) \
-                .filter(ResultTable.saved_in_hdf5.is_(False)) \
+            results = (
+                session.query(ResultTable)
+                .filter(ResultTable.saved_in_hdf5.is_(False))
                 .all()
+            )
             if len(results) == 0:
-                logging.debug("No results need migrating. Done")
+                logger.debug("No results need migrating. Done")
             else:
-                logging.debug(f"Found {len(results)} results to migrate")
-                result_records = list(map(lambda r: r.to_record(), results))
-                migrated_ids = results_db.migrate_result_records(result_records)
-                logging.debug(f"Migrated {len(migrated_ids)} to hdf5")
+                logger.debug(f"Found {len(results)} results to migrate")
+                # result_records = list(map(lambda r: r.to_record(), results))
+                migrated_ids = results_db.migrate_result_records(results)
+                logger.debug(f"Migrated {len(migrated_ids)} to hdf5")
                 for result in results:
                     result.saved_in_hdf5 = True
                 session.commit()
-                logging.debug("Marked results in sqlite as `saved_in_hdf5`. Done")
+                logger.debug("Marked results in sqlite as `saved_in_hdf5`. Done")

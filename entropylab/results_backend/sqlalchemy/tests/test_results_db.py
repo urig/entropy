@@ -7,7 +7,11 @@ import numpy as np
 import pytest
 
 from entropylab import RawResultData
-from entropylab.results_backend.sqlalchemy.results_db import ResultsDB, HDF_FILENAME, _get_all_or_single
+from entropylab.results_backend.sqlalchemy.results_db import (
+    ResultsDB,
+    HDF_FILENAME,
+    _get_all_or_single,
+)
 from entropylab.results_backend.sqlalchemy.model import ResultDataType
 
 
@@ -20,7 +24,6 @@ class Picklable(object):
 
 
 class UnPicklable(object):
-
     def __init__(self, foo):
         self.foo = foo
         self.baz = lambda: print("You can't pickle me")
@@ -30,11 +33,25 @@ class UnPicklable(object):
 
 
 @pytest.mark.parametrize(
-    "data", [
-        42, True, 3.14159265359, -160000000000000, np.int64(42), "foo", [1, 2, 3], np.arange(12),
-        ["foo", "bar", "baz"], (42, 2), (42, "foo"), {"foo": "bar"}, ResultDataType.String,
-        Picklable("bar"), UnPicklable("bar")
-    ])
+    "data",
+    [
+        42,
+        True,
+        3.14159265359,
+        -160000000000000,
+        np.int64(42),
+        "foo",
+        [1, 2, 3],
+        np.arange(12),
+        ["foo", "bar", "baz"],
+        (42, 2),
+        (42, "foo"),
+        {"foo": "bar"},
+        ResultDataType.String,
+        Picklable("bar"),
+        UnPicklable("bar"),
+    ],
+)
 def test_write_and_read_single_result(data: Any):
     target = ResultsDB()
     try:
@@ -55,7 +72,8 @@ def test_write_and_read_single_result(data: Any):
             assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
-                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable")
+                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
+            )
         else:
             assert actual.data == data
 
@@ -86,8 +104,6 @@ def test_get_results_two_results():
 
     finally:
         # clean up
-        # filename = target._ResultsDB__get_filename(experiment_id)
-        # os.remove(filename)
         os.remove(HDF_FILENAME)
 
 
@@ -136,10 +152,8 @@ def test_get_last_result_of_experiment_when_no_experiment():
     try:
         # arrange
         experiment_id = randrange(10000000)
-
         # act
         actual = target.get_last_result_of_experiment(experiment_id)
-
         # assert
         assert actual is None
     finally:
@@ -151,7 +165,7 @@ def test_get_children_or_by_name_when_label_is_not_specified(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
-        with h5py.File(filename, 'w') as file:
+        with h5py.File(filename, "w") as file:
             file.create_dataset("foo", data=42)
             file.create_dataset("bar", data=-3.1412)
             # act
@@ -170,7 +184,7 @@ def test_get_children_or_by_name_when_label_is_specified(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
-        with h5py.File(filename, 'w') as file:
+        with h5py.File(filename, "w") as file:
             file.create_dataset("foo", data=42)
             # act
             actual = _get_all_or_single(file, "foo")
@@ -186,7 +200,7 @@ def test_get_children_or_by_name_when_label_is_not_in_group(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
-        with h5py.File(filename, 'w') as file:
+        with h5py.File(filename, "w") as file:
             file.create_dataset("foo", data=42)
             # act
             actual = _get_all_or_single(file, "bar")
@@ -201,7 +215,7 @@ def test_get_children_or_by_name_when_group_is_empty(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
-        with h5py.File(filename, 'w') as file:
+        with h5py.File(filename, "w") as file:
             # act
             actual = _get_all_or_single(file)
             # assert

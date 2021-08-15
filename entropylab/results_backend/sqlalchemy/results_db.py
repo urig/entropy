@@ -1,4 +1,3 @@
-import logging
 import pickle
 from datetime import datetime
 from typing import Optional, Any, Iterable
@@ -7,13 +6,14 @@ import h5py
 
 from entropylab import RawResultData
 from entropylab.api.data_reader import ResultRecord
-from entropylab.results_backend.sqlalchemy.model import ResultDataType
+from entropylab.logger import logger
+from entropylab.results_backend.sqlalchemy.model import ResultDataType, ResultTable
 
 HDF_FILENAME = "./entropy.hdf5"
 
 
 def _experiment_from(dset: h5py.Dataset) -> int:
-    return dset.attrs['experiment_id']
+    return dset.attrs["experiment_id"]
 
 
 def _id_from(dset: h5py.Dataset) -> str:
@@ -21,38 +21,38 @@ def _id_from(dset: h5py.Dataset) -> str:
 
 
 def _stage_from(dset: h5py.Dataset) -> int:
-    return dset.attrs['stage']
+    return dset.attrs["stage"]
 
 
 def _label_from(dset: h5py.Dataset) -> str:
-    return dset.attrs['label']
+    return dset.attrs["label"]
 
 
 def _story_from(dset: h5py.Dataset) -> str:
-    return dset.attrs['story']
+    return dset.attrs["story"]
 
 
 def _data_from(dset: h5py.Dataset) -> Any:
     data = dset[()]
-    if dset.dtype.metadata and dset.dtype.metadata.get('vlen') == str:
+    if dset.dtype.metadata and dset.dtype.metadata.get("vlen") == str:
         return dset.asstr()[()]
-    elif dset.attrs.get('data_type') == ResultDataType.Pickled.value:
+    elif dset.attrs.get("data_type") == ResultDataType.Pickled.value:
         return pickle.loads(data)
-    elif dset.attrs.get('data_type') == ResultDataType.String.value:
-        # TODO: Prove this works with a test
+    elif dset.attrs.get("data_type") == ResultDataType.String.value:
         return data.decode()
     else:
         return data
 
 
 def _time_from(dset: h5py.Dataset) -> datetime:
-    return datetime.fromisoformat(dset.attrs['time'])
+    return datetime.fromisoformat(dset.attrs["time"])
 
 
 def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     return ResultRecord(
         experiment_id=_experiment_from(dset),
-        # TODO: Get confirmation to change id to string + uniqueness of (exp, stg, lbl) combination
+        # TODO: Get confirmation to change id to string
+        # TODO uniqueness of (exp, stg, lbl) combination
         id=0,  # id_from(dset),
         label=_label_from(dset),
         story=_story_from(dset),
@@ -86,21 +86,23 @@ def _get_all_or_single(group: h5py.Group, name: Optional[str] = None):
 
 # noinspection PyMethodMayBeStatic,PyBroadException
 class ResultsDB:
-
     def __init__(self):
-        # TODO: Validate hdf5 file access permissions here?
-        pass
+        self._check_file_permissions()
+
+    def _check_file_permissions(self):
+        file = h5py.File(HDF_FILENAME, "a")
+        file.close()
 
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
-        with h5py.File(HDF_FILENAME, 'a') as file:
+        with h5py.File(HDF_FILENAME, "a") as file:
             path = f"/{experiment_id}/{result.stage}"
             group = file.require_group(path)
             dset = self.__create_dataset(group, result.label, result.data)
-            dset.attrs.create('experiment_id', experiment_id)
-            dset.attrs.create('stage', result.stage)
-            dset.attrs.create('label', result.label or "")
-            dset.attrs.create('story', result.story or "")
-            dset.attrs.create('time', datetime.now().astimezone().isoformat())
+            dset.attrs.create("experiment_id", experiment_id)
+            dset.attrs.create("stage", result.stage)
+            dset.attrs.create("label", result.label or "")
+            dset.attrs.create("story", result.story or "")
+            dset.attrs.create("time", datetime.now().astimezone().isoformat())
             return dset.name
 
     def __create_dataset(self, group: h5py.Group, name: str, data: Any) -> h5py.Dataset:
@@ -108,9 +110,9 @@ class ResultsDB:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
             data_type, pickled = self.__pickle_data(data)
-            dtype = h5py.string_dtype(encoding='ascii', length=len(pickled))
+            dtype = h5py.string_dtype(encoding="ascii", length=len(pickled))
             dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
-            dset.attrs.create('data_type', data_type.value, dtype='i2')
+            dset.attrs.create("data_type", data_type.value, dtype="i2")
         return dset
 
     def __pickle_data(self, data: Any):
@@ -122,49 +124,52 @@ class ResultsDB:
             data_type = ResultDataType.String
         return data_type, pickled
 
-    def migrate_result_records(self, result_records: Iterable[ResultRecord]) -> list[int]:
-        if result_records is None:
+    def migrate_result_records(self, results: Iterable[ResultTable]) -> list[int]:
+        if results is None:
             return []
-        with h5py.File(HDF_FILENAME, 'a') as file:
+        with h5py.File(HDF_FILENAME, "a") as file:
             sqlalchemy_ids = []
-            for result_record in result_records:
-                if not result_record.saved_in_hdf5:
+            for result in results:
+                if not result.saved_in_hdf5:
                     try:
+                        result_record = result.to_record()
                         hdf5_id = self.__migrate_result_record(file, result_record)
-                        sqlalchemy_ids.append(result_record.id)
-                        # TODO: switch to entropy.logging
-                        logging.debug(f"Migrated result with id [{result_record.id}] to HDF5 with id [{hdf5_id}]")
+                        sqlalchemy_ids.append(result.id)
+                        logger.debug(
+                            f"Migrated result with id [{result.id}] to HDF5 with id [{hdf5_id}]"
+                        )
                     except Exception:
-                        logging.exception(f"Failed to migrate result with id [{result_record.id}] to HDF5")
+                        logger.exception(
+                            f"Failed to migrate result with id [{result.id}] to HDF5"
+                        )
             return sqlalchemy_ids
 
-    # TODO: Change from ResultRecord to RecordTable
-    def __migrate_result_record(self, file: h5py.File, result_record: ResultRecord) -> str:
+    def __migrate_result_record(
+        self, file: h5py.File, result_record: ResultRecord
+    ) -> str:
         path = f"/{result_record.experiment_id}/{result_record.stage}"
         group = file.require_group(path)
-        dset = group.create_dataset(
-            name=result_record.label,
-            data=result_record.data)
-        dset.attrs.create('experiment_id', result_record.experiment_id)
-        dset.attrs.create('stage', result_record.stage)
-        dset.attrs.create('label', result_record.label or "")
-        dset.attrs.create('story', result_record.story or "")
-        dset.attrs.create('time', result_record.time.astimezone().isoformat())
-        dset.attrs.create('migrated_id', result_record.id or "")
+        dset = group.create_dataset(name=result_record.label, data=result_record.data)
+        dset.attrs.create("experiment_id", result_record.experiment_id)
+        dset.attrs.create("stage", result_record.stage)
+        dset.attrs.create("label", result_record.label or "")
+        dset.attrs.create("story", result_record.story or "")
+        dset.attrs.create("time", result_record.time.astimezone().isoformat())
+        dset.attrs.create("migrated_id", result_record.id or "")
         return dset.name
 
     def get_results(
-            self,
-            experiment_id: Optional[int] = None,
-            stage: Optional[int] = None,
-            label: Optional[str] = None,
+        self,
+        experiment_id: Optional[int] = None,
+        stage: Optional[int] = None,
+        label: Optional[str] = None,
     ) -> Iterable[ResultRecord]:
         """
         Retrieves ResultRecords from HDF5.
         """
         result = []
         try:
-            with h5py.File(HDF_FILENAME, 'r') as file:
+            with h5py.File(HDF_FILENAME, "r") as file:
                 exp_groups = _get_all_or_single(file, experiment_id)
                 for exp_group in exp_groups:
                     stage_groups = _get_all_or_single(exp_group, stage)
@@ -176,7 +181,9 @@ class ResultsDB:
         except FileNotFoundError:
             return result
 
-    def get_last_result_of_experiment(self, experiment_id: int) -> Optional[ResultRecord]:
+    def get_last_result_of_experiment(
+        self, experiment_id: int
+    ) -> Optional[ResultRecord]:
         results = list(self.get_results(experiment_id, None, None))
         if results and len(results) > 0:
             results.sort(key=lambda x: x.time, reverse=True)
