@@ -9,6 +9,7 @@ from entropylab.api.data_reader import ResultRecord
 from entropylab.logger import logger
 from entropylab.results_backend.sqlalchemy.model import ResultDataType, ResultTable
 
+# TODO: Inject via __init__() (to be read from config above)
 HDF_FILENAME = "./entropy.hdf5"
 
 
@@ -95,6 +96,7 @@ class HDF5ResultsDB:
 
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
         with h5py.File(HDF_FILENAME, "a") as file:
+            # TODO: Add group for "results"
             path = f"/{experiment_id}/{result.stage}"
             group = file.require_group(path)
             dset = self.__create_dataset(group, result.label, result.data)
@@ -110,6 +112,7 @@ class HDF5ResultsDB:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
             data_type, pickled = self.__pickle_data(data)
+            # TODO: Why ascii? Why string_dtype? Maybe just save bytes...
             dtype = h5py.string_dtype(encoding="ascii", length=len(pickled))
             dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
             dset.attrs.create("data_type", data_type.value, dtype="i2")
@@ -125,6 +128,7 @@ class HDF5ResultsDB:
         return data_type, pickled
 
     def migrate_result_records(self, results: Iterable[ResultTable]) -> list[int]:
+        # TODO: Add docstring
         if results is None:
             return []
         with h5py.File(HDF_FILENAME, "a") as file:
@@ -147,6 +151,7 @@ class HDF5ResultsDB:
     def __migrate_result_record(
         self, file: h5py.File, result_record: ResultRecord
     ) -> str:
+        # TODO: Refactor to single internal method (see save_results())
         path = f"/{result_record.experiment_id}/{result_record.stage}"
         group = file.require_group(path)
         dset = group.create_dataset(name=result_record.label, data=result_record.data)
@@ -178,7 +183,9 @@ class HDF5ResultsDB:
                         for label_dset in label_dsets:
                             result.append(_build_result_record(label_dset))
             return result
-        except FileNotFoundError:
+        except FileNotFoundError as ex:
+            # TODO: Log input args:
+            logger.exception("FileNotFoundError in get_results()")
             return result
 
     def get_last_result_of_experiment(

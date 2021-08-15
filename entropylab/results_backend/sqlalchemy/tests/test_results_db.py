@@ -50,6 +50,7 @@ class UnPicklable(object):
         ResultDataType.String,
         Picklable("bar"),
         UnPicklable("bar"),
+        # TODO: Add test case for fixed length string
     ],
 )
 def test_write_and_read_single_result(data: Any):

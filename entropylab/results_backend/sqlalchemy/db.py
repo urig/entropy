@@ -67,12 +67,6 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
 
     __SAVE_RESULTS_IN_HDF5 = True
 
-    @staticmethod
-    def __create_parent_dirs(path) -> None:
-        dirname = os.path.dirname(path)
-        if dirname and dirname != "" and dirname != ".":
-            os.makedirs(dirname, exist_ok=True)
-
     def __init__(self, path=None, echo=False):
         """
             Database implementation using SqlAlchemy package for results (DataWriter
@@ -89,6 +83,12 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         self._engine = create_engine(dsn, echo=echo)
         self._Session = sessionmaker(bind=self._engine)
         _DbInitializer(self._engine).validate_db()
+
+    @staticmethod
+    def __create_parent_dirs(path) -> None:
+        dirname = os.path.dirname(path)
+        if dirname and dirname != "" and dirname != ".":
+            os.makedirs(dirname, exist_ok=True)
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
         transaction = ExperimentTable.from_initial_data(initial_data)

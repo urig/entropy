@@ -82,7 +82,6 @@ class _DbInitializer:
                 logger.debug("No results need migrating. Done")
             else:
                 logger.debug(f"Found {len(results)} results to migrate")
-                # result_records = list(map(lambda r: r.to_record(), results))
                 migrated_ids = results_db.migrate_result_records(results)
                 logger.debug(f"Migrated {len(migrated_ids)} to hdf5")
                 for result in results:
