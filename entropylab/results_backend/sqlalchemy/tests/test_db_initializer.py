@@ -2,7 +2,7 @@ import os
 
 import entropylab
 from entropylab import SqlAlchemyDB, RawResultData
-from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, ResultsDB
+from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, HDF5ResultsDB
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
 
@@ -21,7 +21,7 @@ def test__migrate_results_to_hdf5():
         # act
         target._migrate_results_to_hdf5()
         # assert
-        results_db = ResultsDB()
+        results_db = HDF5ResultsDB()
         hdf5_results = results_db.get_results()
         assert len(hdf5_results) == 5
         cur = target._engine.execute("SELECT * FROM Results WHERE saved_in_hdf5 = 1")

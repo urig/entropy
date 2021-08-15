@@ -85,7 +85,7 @@ def _get_all_or_single(group: h5py.Group, name: Optional[str] = None):
 
 
 # noinspection PyMethodMayBeStatic,PyBroadException
-class ResultsDB:
+class HDF5ResultsDB:
     def __init__(self):
         self._check_file_permissions()
 

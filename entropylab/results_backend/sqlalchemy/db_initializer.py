@@ -8,7 +8,7 @@ from alembic.runtime import migration
 from sqlalchemy.orm import sessionmaker
 
 from entropylab.logger import logger
-from entropylab.results_backend.sqlalchemy.results_db import ResultsDB
+from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
 
 
@@ -70,7 +70,7 @@ class _DbInitializer:
 
     def _migrate_results_to_hdf5(self):
         logger.debug("Migrating results from sqlite to hdf5")
-        results_db = ResultsDB()
+        results_db = HDF5ResultsDB()
         session_maker = sessionmaker(bind=self._engine)
         with session_maker() as session:
             results = (

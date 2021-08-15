@@ -8,7 +8,7 @@ import pytest
 
 from entropylab import RawResultData
 from entropylab.results_backend.sqlalchemy.results_db import (
-    ResultsDB,
+    HDF5ResultsDB,
     HDF_FILENAME,
     _get_all_or_single,
 )
@@ -53,7 +53,7 @@ class UnPicklable(object):
     ],
 )
 def test_write_and_read_single_result(data: Any):
-    target = ResultsDB()
+    target = HDF5ResultsDB()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -83,7 +83,7 @@ def test_write_and_read_single_result(data: Any):
 
 
 def test_get_results_two_results():
-    target = ResultsDB()
+    target = HDF5ResultsDB()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -108,7 +108,7 @@ def test_get_results_two_results():
 
 
 def test_get_last_result_of_experiment():
-    target = ResultsDB()
+    target = HDF5ResultsDB()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -134,7 +134,7 @@ def test_get_last_result_of_experiment():
 
 
 def test_get_last_result_of_experiment_when_no_file():
-    target = ResultsDB()
+    target = HDF5ResultsDB()
     # arrange
     experiment_id = randrange(10000000)
     result = RawResultData(stage=0, label="foo", data=np.arange(12))
@@ -148,7 +148,7 @@ def test_get_last_result_of_experiment_when_no_file():
 
 
 def test_get_last_result_of_experiment_when_no_experiment():
-    target = ResultsDB()
+    target = HDF5ResultsDB()
     try:
         # arrange
         experiment_id = randrange(10000000)
