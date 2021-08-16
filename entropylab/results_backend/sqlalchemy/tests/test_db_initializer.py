@@ -7,11 +7,11 @@ from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, HDF5R
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
 
-def test_upgrade_db_when_initial_db_is_empty(request):
+def test_upgrade_db_when_initial_db_is_empty():
+    # arrange
+    db_template = f"./db_templates/initial.db"
+    db_under_test = _get_test_file_name(db_template)
     try:
-        # arrange
-        db_template = f"./db_templates/initial.db"
-        db_under_test = _get_test_file_name(db_template)
         copyfile(db_template, db_under_test)
         target = _DbInitializer(db_under_test, echo=True)
         # act
@@ -29,21 +29,28 @@ def test_upgrade_db_when_initial_db_is_empty(request):
         _delete_if_exists(db_under_test)
 
 
-def test_upgrade_db_when_db_is_in_memory(request):
-    target = _DbInitializer(":memory:", echo=True)
-    # act
-    target.upgrade_db()
-    # assert
-    cur = target._engine.execute("SELECT sql FROM sqlite_master WHERE name = 'Results'")
-    res = cur.fetchone()
-    cur.close()
-    assert "saved_in_hdf5" in res[0]
+def test_upgrade_db_when_db_is_in_memory():
+    try:
+        # arrange
+        target = _DbInitializer(":memory:", echo=True)
+        # act
+        target.upgrade_db()
+        # assert
+        cur = target._engine.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'Results'"
+        )
+        res = cur.fetchone()
+        cur.close()
+        assert "saved_in_hdf5" in res[0]
+    finally:
+        # clean up
+        _delete_if_exists(HDF_FILENAME)
 
 
 def test__migrate_results_to_hdf5(request):
+    # arrange
+    path = f"./tests_cache/{request.node.name}.db"
     try:
-        path = f"./tests_cache/{request.node.name}.db"
-        # arrange
         db = SqlAlchemyDB(path, echo=True)
         db.__SAVE_RESULTS_IN_HDF5 = False
         db.save_result(1, RawResultData(stage=1, label="foo", data="bar"))
@@ -57,7 +64,7 @@ def test__migrate_results_to_hdf5(request):
         # assert
         results_db = HDF5ResultsDB()
         hdf5_results = results_db.get_results()
-        assert len(hdf5_results) == 5
+        assert len(list(hdf5_results)) == 5
         cur = target._engine.execute("SELECT * FROM Results WHERE saved_in_hdf5 = 1")
         res = cur.all()
         assert len(res) == 5

@@ -38,7 +38,6 @@ class _DbInitializer:
 
     # TODO: Hide behind module/db.py level function
     def upgrade_db(self) -> None:
-        # TODO: Test that this doesn't blow up when in memory
         self._alembic_upgrade()
         self._migrate_results_to_hdf5()
 
@@ -70,19 +69,27 @@ class _DbInitializer:
         return os.path.join(source_dir, rel_path)
 
     def _alembic_upgrade(self) -> None:
-        alembic_cfg = self._alembic_build_config()
-        command.upgrade(alembic_cfg, "head")
+        with self._engine.connect() as connection:
+            alembic_cfg = self._alembic_build_config(connection)
+            command.upgrade(alembic_cfg, "head")
 
     def _alembic_stamp_head(self) -> None:
-        alembic_cfg = self._alembic_build_config()
-        command.stamp(alembic_cfg, "head")
+        with self._engine.connect() as connection:
+            alembic_cfg = self._alembic_build_config(connection)
+            command.stamp(alembic_cfg, "head")
 
-    def _alembic_build_config(self) -> Config:
+    def _alembic_build_config(self, connection: sqlalchemy.engine.Connection) -> Config:
         config_location = self._abs_path_to("alembic.ini")
         script_location = self._abs_path_to("alembic")
         alembic_cfg = Config(config_location)
         alembic_cfg.set_main_option("script_location", script_location)
-        alembic_cfg.set_main_option("sqlalchemy.url", str(self._engine.url))
+        """
+        Modified by @urig to share a single engine across multiple (typically in-memory)
+        connections, based on this cookbook recipe:
+        https://alembic.sqlalchemy.org/en/latest/cookbook.html#connection-sharing 
+        """
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite:///:memory:")
+        alembic_cfg.attributes["connection"] = connection  # overrides dummy url above
         return alembic_cfg
 
     def _migrate_results_to_hdf5(self):
