@@ -53,7 +53,6 @@ def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     return ResultRecord(
         experiment_id=_experiment_from(dset),
         # TODO: Get confirmation to change id to string
-        # TODO uniqueness of (exp, stg, lbl) combination
         id=0,  # id_from(dset),
         label=_label_from(dset),
         story=_story_from(dset),
@@ -96,18 +95,40 @@ class HDF5ResultsDB:
 
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
         with h5py.File(HDF_FILENAME, "a") as file:
-            # TODO: Add group for "results"
-            path = f"/{experiment_id}/{result.stage}"
-            group = file.require_group(path)
-            dset = self.__create_dataset(group, result.label, result.data)
-            dset.attrs.create("experiment_id", experiment_id)
-            dset.attrs.create("stage", result.stage)
-            dset.attrs.create("label", result.label or "")
-            dset.attrs.create("story", result.story or "")
-            dset.attrs.create("time", datetime.now().astimezone().isoformat())
-            return dset.name
+            return self._save_result_to_file(
+                file,
+                experiment_id,
+                result.stage,
+                result.label,
+                result.data,
+                result.story,
+                datetime.now(),
+            )
 
-    def __create_dataset(self, group: h5py.Group, name: str, data: Any) -> h5py.Dataset:
+    def _save_result_to_file(
+        self,
+        file: h5py.File,
+        experiment_id: int,
+        stage: int,
+        label: str,
+        data: Any,
+        story: str,
+        time: datetime,
+        migrated_id: Optional[int] = None,
+    ) -> str:
+        path = f"/{experiment_id}/{stage}"
+        group = file.require_group(path)
+        dset = self._create_dataset(group, label, data)
+        dset.attrs.create("experiment_id", experiment_id)
+        dset.attrs.create("stage", stage)
+        dset.attrs.create("label", label)
+        dset.attrs.create("story", story or "")
+        dset.attrs.create("time", time.astimezone().isoformat())
+        if migrated_id:
+            dset.attrs.create("migrated_id", migrated_id or "")
+        return dset.name
+
+    def _create_dataset(self, group: h5py.Group, name: str, data: Any) -> h5py.Dataset:
         try:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
@@ -137,7 +158,7 @@ class HDF5ResultsDB:
                 if not result.saved_in_hdf5:
                     try:
                         result_record = result.to_record()
-                        hdf5_id = self.__migrate_result_record(file, result_record)
+                        hdf5_id = self._migrate_result_record(file, result_record)
                         sqlalchemy_ids.append(result.id)
                         logger.debug(
                             f"Migrated result with id [{result.id}] to HDF5 with id [{hdf5_id}]"
@@ -148,20 +169,19 @@ class HDF5ResultsDB:
                         )
             return sqlalchemy_ids
 
-    def __migrate_result_record(
+    def _migrate_result_record(
         self, file: h5py.File, result_record: ResultRecord
     ) -> str:
-        # TODO: Refactor to single internal method (see save_results())
-        path = f"/{result_record.experiment_id}/{result_record.stage}"
-        group = file.require_group(path)
-        dset = group.create_dataset(name=result_record.label, data=result_record.data)
-        dset.attrs.create("experiment_id", result_record.experiment_id)
-        dset.attrs.create("stage", result_record.stage)
-        dset.attrs.create("label", result_record.label or "")
-        dset.attrs.create("story", result_record.story or "")
-        dset.attrs.create("time", result_record.time.astimezone().isoformat())
-        dset.attrs.create("migrated_id", result_record.id or "")
-        return dset.name
+        return self._save_result_to_file(
+            file,
+            result_record.experiment_id,
+            result_record.stage,
+            result_record.label,
+            result_record.data,
+            result_record.story,
+            result_record.time,
+            result_record.id,
+        )
 
     def get_results(
         self,
@@ -183,7 +203,7 @@ class HDF5ResultsDB:
                         for label_dset in label_dsets:
                             result.append(_build_result_record(label_dset))
             return result
-        except FileNotFoundError as ex:
+        except FileNotFoundError:
             # TODO: Log input args:
             logger.exception("FileNotFoundError in get_results()")
             return result
