@@ -124,7 +124,7 @@ class HDF5ResultsDB:
         time: datetime,
         migrated_id: Optional[int] = None,
     ) -> str:
-        path = f"/{experiment_id}/{stage}/{label}"
+        path = f"/experiments/{experiment_id}/{stage}/{label}"
         group = file.require_group(path)
         dset = self._create_dataset(group, entity_type, data)
         dset.attrs.create("experiment_id", experiment_id)
@@ -207,7 +207,8 @@ class HDF5ResultsDB:
         result = []
         try:
             with h5py.File(HDF_FILENAME, "r") as file:
-                exp_groups = _get_all_or_single(file, experiment_id)
+                top_group = file["experiments"]
+                exp_groups = _get_all_or_single(top_group, experiment_id)
                 for exp_group in exp_groups:
                     stage_groups = _get_all_or_single(exp_group, stage)
                     for stage_group in stage_groups:
