@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from entropylab import RawResultData
+from entropylab.api.data_writer import Metadata
 from entropylab.results_backend.sqlalchemy.results_db import (
     HDF5ResultsDB,
     HDF_FILENAME,
@@ -77,6 +78,56 @@ def test_write_and_read_single_result(data: Any):
             )
         else:
             assert actual.data == data
+
+    finally:
+        # clean up
+        os.remove(HDF_FILENAME)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        42,
+        True,
+        3.14159265359,
+        -160000000000000,
+        np.int64(42),
+        "foo",
+        [1, 2, 3],
+        np.arange(12),
+        ["foo", "bar", "baz"],
+        (42, 2),
+        (42, "foo"),
+        {"foo": "bar"},
+        ResultDataType.String,
+        Picklable("bar"),
+        UnPicklable("bar"),
+        # TODO: Add test case for fixed length string
+    ],
+)
+def test_write_and_read_single_metadata(data: Any):
+    target = HDF5ResultsDB()
+    try:
+        # arrange
+        experiment_id = randrange(10000000)
+        stage = randrange(1000)
+        metadata = Metadata(label="foo", data=data, stage=stage)
+
+        # act
+        target.save_metadata(experiment_id, metadata)
+        # actual = list(target.get_results(experiment_id, metadata.stage, metadata.label))[0]
+        #
+        # # assert
+        # if isinstance(data, list) or isinstance(data, tuple):
+        #     assert_lists_are_equal(actual.data, data)
+        # elif isinstance(data, np.ndarray):
+        #     assert_lists_are_equal(actual.data, data)
+        # elif isinstance(data, UnPicklable):
+        #     assert str(actual.data).startswith(
+        #         "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
+        #     )
+        # else:
+        #     assert actual.data == data
 
     finally:
         # clean up
