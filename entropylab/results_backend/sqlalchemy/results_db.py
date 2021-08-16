@@ -1,5 +1,6 @@
 import pickle
 from datetime import datetime
+from enum import Enum
 from typing import Optional, Any, Iterable
 
 import h5py
@@ -84,6 +85,11 @@ def _get_all_or_single(group: h5py.Group, name: Optional[str] = None):
             return []
 
 
+class EntityType(Enum):
+    RESULT = 1
+    METADATA = 2
+
+
 # noinspection PyMethodMayBeStatic,PyBroadException
 class HDF5ResultsDB:
     def __init__(self):
@@ -95,30 +101,32 @@ class HDF5ResultsDB:
 
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
         with h5py.File(HDF_FILENAME, "a") as file:
-            return self._save_result_to_file(
+            return self._save_entity_to_file(
                 file,
                 experiment_id,
                 result.stage,
                 result.label,
+                EntityType.RESULT,
                 result.data,
                 result.story,
                 datetime.now(),
             )
 
-    def _save_result_to_file(
+    def _save_entity_to_file(
         self,
         file: h5py.File,
         experiment_id: int,
         stage: int,
         label: str,
+        entity_type: EntityType,
         data: Any,
         story: str,
         time: datetime,
         migrated_id: Optional[int] = None,
     ) -> str:
-        path = f"/{experiment_id}/{stage}"
+        path = f"/{experiment_id}/{stage}/{label}"
         group = file.require_group(path)
-        dset = self._create_dataset(group, label, data)
+        dset = self._create_dataset(group, entity_type, data)
         dset.attrs.create("experiment_id", experiment_id)
         dset.attrs.create("stage", stage)
         dset.attrs.create("label", label)
@@ -128,7 +136,10 @@ class HDF5ResultsDB:
             dset.attrs.create("migrated_id", migrated_id or "")
         return dset.name
 
-    def _create_dataset(self, group: h5py.Group, name: str, data: Any) -> h5py.Dataset:
+    def _create_dataset(
+        self, group: h5py.Group, entity_type: EntityType, data: Any
+    ) -> h5py.Dataset:
+        name = entity_type.name.lower()
         try:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
@@ -172,11 +183,12 @@ class HDF5ResultsDB:
     def _migrate_result_record(
         self, file: h5py.File, result_record: ResultRecord
     ) -> str:
-        return self._save_result_to_file(
+        return self._save_entity_to_file(
             file,
             result_record.experiment_id,
             result_record.stage,
             result_record.label,
+            EntityType.RESULT,
             result_record.data,
             result_record.story,
             result_record.time,
@@ -199,9 +211,10 @@ class HDF5ResultsDB:
                 for exp_group in exp_groups:
                     stage_groups = _get_all_or_single(exp_group, stage)
                     for stage_group in stage_groups:
-                        label_dsets = _get_all_or_single(stage_group, label)
-                        for label_dset in label_dsets:
-                            result.append(_build_result_record(label_dset))
+                        label_groups = _get_all_or_single(stage_group, label)
+                        for label_group in label_groups:
+                            dset_name = EntityType.RESULT.name.lower()
+                            result.append(_build_result_record(label_group[dset_name]))
             return result
         except FileNotFoundError:
             # TODO: Log input args:

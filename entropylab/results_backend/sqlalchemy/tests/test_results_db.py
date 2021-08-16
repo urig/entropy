@@ -92,7 +92,7 @@ def test_get_results_two_results():
         result.story = "A long time ago in a galaxy far, far away..."
         target.save_result(experiment_id, result)
         result2 = RawResultData(stage=0, label="bar", data=np.arange(9))
-        result.story = "A long time ago in a galaxy far, far away..."
+        result2.story = "A long time ago in a galaxy far, far away..."
         target.save_result(experiment_id, result2)
 
         # act
