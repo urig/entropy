@@ -29,6 +29,17 @@ def test_upgrade_db_when_initial_db_is_empty(request):
         _delete_if_exists(db_under_test)
 
 
+def test_upgrade_db_when_db_is_in_memory(request):
+    target = _DbInitializer(":memory:", echo=True)
+    # act
+    target.upgrade_db()
+    # assert
+    cur = target._engine.execute("SELECT sql FROM sqlite_master WHERE name = 'Results'")
+    res = cur.fetchone()
+    cur.close()
+    assert "saved_in_hdf5" in res[0]
+
+
 def test__migrate_results_to_hdf5(request):
     try:
         path = f"./tests_cache/{request.node.name}.db"
