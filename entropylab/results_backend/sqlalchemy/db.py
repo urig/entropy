@@ -52,7 +52,6 @@ from entropylab.results_backend.sqlalchemy.model import (
     NodeTable,
 )
 
-_SQL_ALCHEMY_MEMORY = ":memory:"
 T = TypeVar(
     "T",
 )
@@ -75,20 +74,9 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         :param echo: if True, the database engine will log all statements
         """
         super(SqlAlchemyDB, self).__init__()
-        if path is None:
-            path = _SQL_ALCHEMY_MEMORY
-        if path != _SQL_ALCHEMY_MEMORY:
-            self.__create_parent_dirs(path)
-        dsn = "sqlite:///" + path
-        self._engine = create_engine(dsn, echo=echo)
+        self._engine = _DbInitializer(path, echo=echo).init_db()
+        # self._engine = create_engine(dsn, echo=echo)
         self._Session = sessionmaker(bind=self._engine)
-        _DbInitializer(self._engine).validate_db()
-
-    @staticmethod
-    def __create_parent_dirs(path) -> None:
-        dirname = os.path.dirname(path)
-        if dirname and dirname != "" and dirname != ".":
-            os.makedirs(dirname, exist_ok=True)
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
         transaction = ExperimentTable.from_initial_data(initial_data)

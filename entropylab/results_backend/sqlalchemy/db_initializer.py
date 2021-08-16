@@ -1,30 +1,47 @@
 import os
 from pathlib import Path
 
-import sqlalchemy.engine
 from alembic import script, command
 from alembic.config import Config
 from alembic.runtime import migration
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from entropylab.logger import logger
-from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
+from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB
+
+_SQL_ALCHEMY_MEMORY = ":memory:"
 
 
 class _DbInitializer:
-    def __init__(self, engine: sqlalchemy.engine.Engine):
-        self._engine = engine
 
-    def validate_db(self) -> None:
+    def __init__(self, path: str, echo=False):
+        if path is None:
+            path = _SQL_ALCHEMY_MEMORY
+        if path != _SQL_ALCHEMY_MEMORY:
+            self.__create_parent_dirs(path)
+        dsn = "sqlite:///" + path
+        self._engine = create_engine(dsn, echo=echo)
+
+    @staticmethod
+    def __create_parent_dirs(path) -> None:
+        dirname = os.path.dirname(path)
+        if dirname and dirname != "" and dirname != ".":
+            os.makedirs(dirname, exist_ok=True)
+
+    def init_db(self) -> Engine:
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
             self._alembic_stamp_head()
-        elif not self._db_is_up_to_date():
-            raise Exception(
-                "Database is not up-to-date. Upgrade the database using "
-                "DbInitializer's update_db() method."
-            )
+        else:
+            if not self._db_is_up_to_date():
+                raise Exception(
+                    "Database is not up-to-date. Upgrade the database using "
+                    "DbInitializer's update_db() method."
+                )
+        return self._engine
 
     def _db_is_empty(self) -> bool:
         cursor = self._engine.execute(
@@ -75,8 +92,8 @@ class _DbInitializer:
         with session_maker() as session:
             results = (
                 session.query(ResultTable)
-                .filter(ResultTable.saved_in_hdf5.is_(False))
-                .all()
+                    .filter(ResultTable.saved_in_hdf5.is_(False))
+                    .all()
             )
             if len(results) == 0:
                 logger.debug("No results need migrating. Done")

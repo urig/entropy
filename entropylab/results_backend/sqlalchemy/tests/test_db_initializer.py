@@ -10,14 +10,14 @@ def test__migrate_results_to_hdf5():
     try:
         entropylab.results_backend._HDF5_RESULTS_DB = False
         # arrange
-        db = SqlAlchemyDB("tests_cache/tmp.db", echo=True)
+        db = SqlAlchemyDB("tests_cache/tmp3.db", echo=True)
         db.__SAVE_RESULTS_IN_HDF5 = False
         db.save_result(1, RawResultData(stage=1, label="foo", data="bar"))
         db.save_result(1, RawResultData(stage=1, label="baz", data="buz"))
         db.save_result(1, RawResultData(stage=2, label="biz", data="bez"))
         db.save_result(2, RawResultData(stage=1, label="bat", data="bot"))
         db.save_result(3, RawResultData(stage=1, label="ooh", data="aah"))
-        target = _DbInitializer(db._engine)
+        target = _DbInitializer("tests_cache/tmp3.db", echo=True)
         # act
         target._migrate_results_to_hdf5()
         # assert
@@ -30,4 +30,4 @@ def test__migrate_results_to_hdf5():
     finally:
         # clean up
         os.remove(HDF_FILENAME)
-        os.remove("tests_cache/tmp.db")
+        # os.remove("tests_cache/tmp.db")
