@@ -75,7 +75,6 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         """
         super(SqlAlchemyDB, self).__init__()
         self._engine = _DbInitializer(path, echo=echo).init_db()
-        # self._engine = create_engine(dsn, echo=echo)
         self._Session = sessionmaker(bind=self._engine)
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:

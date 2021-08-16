@@ -1,23 +1,46 @@
 import os
+from datetime import datetime
+from shutil import copyfile
 
-import entropylab
 from entropylab import SqlAlchemyDB, RawResultData
 from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, HDF5ResultsDB
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
 
-def test__migrate_results_to_hdf5():
+def test_upgrade_db_when_initial_db_is_empty(request):
     try:
-        entropylab.results_backend._HDF5_RESULTS_DB = False
         # arrange
-        db = SqlAlchemyDB("tests_cache/tmp3.db", echo=True)
+        db_template = f"./db_templates/initial.db"
+        db_under_test = _get_test_file_name(db_template)
+        copyfile(db_template, db_under_test)
+        target = _DbInitializer(db_under_test, echo=True)
+        # act
+        target.upgrade_db()
+        # assert
+        cur = target._engine.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'Results'"
+        )
+        res = cur.fetchone()
+        cur.close()
+        assert "saved_in_hdf5" in res[0]
+    finally:
+        # clean up
+        _delete_if_exists(HDF_FILENAME)
+        _delete_if_exists(db_under_test)
+
+
+def test__migrate_results_to_hdf5(request):
+    try:
+        path = f"./tests_cache/{request.node.name}.db"
+        # arrange
+        db = SqlAlchemyDB(path, echo=True)
         db.__SAVE_RESULTS_IN_HDF5 = False
         db.save_result(1, RawResultData(stage=1, label="foo", data="bar"))
         db.save_result(1, RawResultData(stage=1, label="baz", data="buz"))
         db.save_result(1, RawResultData(stage=2, label="biz", data="bez"))
         db.save_result(2, RawResultData(stage=1, label="bat", data="bot"))
         db.save_result(3, RawResultData(stage=1, label="ooh", data="aah"))
-        target = _DbInitializer("tests_cache/tmp3.db", echo=True)
+        target = _DbInitializer(path, echo=True)
         # act
         target._migrate_results_to_hdf5()
         # assert
@@ -29,5 +52,17 @@ def test__migrate_results_to_hdf5():
         assert len(res) == 5
     finally:
         # clean up
-        os.remove(HDF_FILENAME)
-        # os.remove("tests_cache/tmp.db")
+        _delete_if_exists(HDF_FILENAME)
+        _delete_if_exists(path)
+
+
+def _get_test_file_name(filename):
+    timestamp = f"{datetime.now():%Y-%m-%d-%H-%M-%S}"
+    return filename.replace("db_templates", "tests_cache").replace(
+        ".db", f"_{timestamp}.db"
+    )
+
+
+def _delete_if_exists(filename: str):
+    if os.path.isfile(filename):
+        os.remove(filename)
