@@ -240,7 +240,7 @@ def test_get_last_result_of_experiment_when_no_experiment():
         os.remove(HDF_FILENAME)
 
 
-def test_get_children_or_by_name_when_label_is_not_specified(request):
+def test_get_all_or_single_when_label_is_not_specified(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
@@ -259,7 +259,7 @@ def test_get_children_or_by_name_when_label_is_not_specified(request):
         os.remove(filename)
 
 
-def test_get_children_or_by_name_when_label_is_specified(request):
+def test_get_all_or_single_when_label_is_specified(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
@@ -275,7 +275,7 @@ def test_get_children_or_by_name_when_label_is_specified(request):
         os.remove(filename)
 
 
-def test_get_children_or_by_name_when_label_is_not_in_group(request):
+def test_get_all_or_single_when_label_is_not_in_group(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange
@@ -290,7 +290,7 @@ def test_get_children_or_by_name_when_label_is_not_in_group(request):
         os.remove(filename)
 
 
-def test_get_children_or_by_name_when_group_is_empty(request):
+def test_get_all_or_single_when_group_is_empty(request):
     filename = f"./{request.node.name}.hdf5"
     try:
         # arrange

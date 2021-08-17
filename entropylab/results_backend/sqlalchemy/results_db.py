@@ -9,12 +9,17 @@ from entropylab import RawResultData
 from entropylab.api.data_reader import ResultRecord, MetadataRecord
 from entropylab.api.data_writer import Metadata
 from entropylab.logger import logger
-from entropylab.results_backend.sqlalchemy.model import ResultDataType, ResultTable
+from entropylab.results_backend.sqlalchemy.model import (
+    ResultDataType,
+    ResultTable,
+    Base,
+)
 
 # TODO: Inject via __init__() (to be read from config above)
 HDF_FILENAME = "./entropy.hdf5"
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Base)
+R = TypeVar("R", ResultRecord, MetadataRecord)
 
 
 def _experiment_from(dset: h5py.Dataset) -> int:
@@ -108,14 +113,69 @@ class EntityType(Enum):
 
 
 # noinspection PyMethodMayBeStatic,PyBroadException
-class HDF5ResultsDB:
-    def __init__(self):
-        self._check_file_permissions()
+class HDF5Reader:
+    def _get_experiment_entities(
+        self,
+        entity_type: EntityType,
+        convert_from_dset: Callable,
+        experiment_id: Optional[int] = None,
+        stage: Optional[int] = None,
+        label: Optional[str] = None,
+    ) -> Iterable[T]:
+        dsets = []
+        try:
+            with h5py.File(HDF_FILENAME, "r") as file:
+                top_group = file["experiments"]
+                exp_groups = _get_all_or_single(top_group, experiment_id)
+                for exp_group in exp_groups:
+                    stage_groups = _get_all_or_single(exp_group, stage)
+                    for stage_group in stage_groups:
+                        label_groups = _get_all_or_single(stage_group, label)
+                        for label_group in label_groups:
+                            dset_name = entity_type.name.lower()
+                            dset = label_group[dset_name]
+                            dsets.append(convert_from_dset(dset))
+            return dsets
+        except FileNotFoundError:
+            # TODO: Log input args:
+            logger.exception("FileNotFoundError in get_experiment_entities()")
+            return dsets
 
-    def _check_file_permissions(self):
-        file = h5py.File(HDF_FILENAME, "a")
-        file.close()
+    def get_result_records(
+        self,
+        experiment_id: Optional[int] = None,
+        stage: Optional[int] = None,
+        label: Optional[str] = None,
+    ) -> Iterable[ResultRecord]:
+        entities = self._get_experiment_entities(
+            EntityType.RESULT, _build_result_record, experiment_id, stage, label
+        )
+        return entities
 
+    def get_metadata_records(
+        self,
+        experiment_id: Optional[int] = None,
+        stage: Optional[int] = None,
+        label: Optional[str] = None,
+    ) -> Iterable[MetadataRecord]:
+        entities = self._get_experiment_entities(
+            EntityType.METADATA, _build_metadata_record, experiment_id, stage, label
+        )
+        return entities
+        pass
+
+    def get_last_result_of_experiment(
+        self, experiment_id: int
+    ) -> Optional[ResultRecord]:
+        results = list(self.get_result_records(experiment_id, None, None))
+        if results and len(results) > 0:
+            results.sort(key=lambda x: x.time, reverse=True)
+            return results[0]
+        else:
+            return None
+
+
+class HDF5Writer:
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
         with h5py.File(HDF_FILENAME, "a") as file:
             return self._save_entity_to_file(
@@ -180,15 +240,20 @@ class HDF5ResultsDB:
             dset.attrs.create("data_type", data_type.value, dtype="i2")
         return dset
 
-    def _pickle_data(self, data: Any):
+    @staticmethod
+    def _pickle_data(data: Any):
+        # noinspection PyBroadException
         try:
             pickled = pickle.dumps(data)
             data_type = ResultDataType.Pickled
-        except Exception:
+        except Exception as ex:
+            logger.debug("Could not pickle data, defaulting to __repr__()", ex)
             pickled = data.__repr__().encode(encoding="UTF-8")
             data_type = ResultDataType.String
         return data_type, pickled
 
+
+class HDF5Migrator(HDF5Writer):
     def migrate_result_rows(self, rows: Iterable[ResultTable]) -> None:
         self._migrate_rows(EntityType.RESULT, rows)
 
@@ -207,18 +272,18 @@ class HDF5ResultsDB:
                         )
 
     def _migrate_record(
-        self, file: h5py.File, entity_type: EntityType, result_record: T
+        self, file: h5py.File, entity_type: EntityType, record: R
     ) -> str:
         return self._save_entity_to_file(
             file,
             entity_type,
-            result_record.experiment_id,
-            result_record.stage,
-            result_record.label,
-            result_record.data,
-            result_record.time,
-            result_record.story,
-            result_record.id,
+            record.experiment_id,
+            record.stage,
+            record.label,
+            record.data,
+            record.time,
+            record.story,
+            record.id,
         )
 
     def _migrate_result_record(
@@ -236,62 +301,13 @@ class HDF5ResultsDB:
             result_record.id,
         )
 
-    def _get_experiment_entities(
-        self,
-        entity_type: EntityType,
-        convert_from_dset: Callable,
-        experiment_id: Optional[int] = None,
-        stage: Optional[int] = None,
-        label: Optional[str] = None,
-    ) -> Iterable[T]:
-        dsets = []
-        try:
-            with h5py.File(HDF_FILENAME, "r") as file:
-                top_group = file["experiments"]
-                exp_groups = _get_all_or_single(top_group, experiment_id)
-                for exp_group in exp_groups:
-                    stage_groups = _get_all_or_single(exp_group, stage)
-                    for stage_group in stage_groups:
-                        label_groups = _get_all_or_single(stage_group, label)
-                        for label_group in label_groups:
-                            dset_name = entity_type.name.lower()
-                            dset = label_group[dset_name]
-                            dsets.append(convert_from_dset(dset))
-            return dsets
-        except FileNotFoundError:
-            # TODO: Log input args:
-            logger.exception("FileNotFoundError in get_experiment_entities()")
-            return dsets
 
-    def get_result_records(
-        self,
-        experiment_id: Optional[int] = None,
-        stage: Optional[int] = None,
-        label: Optional[str] = None,
-    ) -> Iterable[ResultRecord]:
-        entities = self._get_experiment_entities(
-            EntityType.RESULT, _build_result_record, experiment_id, stage, label
-        )
-        return entities
+# TODO: Rename to HDF5DB
+class HDF5ResultsDB(HDF5Reader, HDF5Migrator, HDF5Writer):
+    def __init__(self):
+        self._check_file_permissions()
 
-    def get_metadata_records(
-        self,
-        experiment_id: Optional[int] = None,
-        stage: Optional[int] = None,
-        label: Optional[str] = None,
-    ) -> Iterable[MetadataRecord]:
-        entities = self._get_experiment_entities(
-            EntityType.METADATA, _build_metadata_record, experiment_id, stage, label
-        )
-        return entities
-        pass
-
-    def get_last_result_of_experiment(
-        self, experiment_id: int
-    ) -> Optional[ResultRecord]:
-        results = list(self.get_result_records(experiment_id, None, None))
-        if results and len(results) > 0:
-            results.sort(key=lambda x: x.time, reverse=True)
-            return results[0]
-        else:
-            return None
+    @staticmethod
+    def _check_file_permissions():
+        file = h5py.File(HDF_FILENAME, "a")
+        file.close()
