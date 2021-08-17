@@ -47,6 +47,7 @@ def _get_class(module_name, class_name):
     return cls
 
 
+# noinspection PyBroadException
 def _encode_serialized_data(data):
     if isinstance(data, (np.ndarray, np.generic)):
         bio = BytesIO()
@@ -121,6 +122,7 @@ class ExperimentTable(Base):
 
 class ResultDataType(enum.Enum):
     """ Numeric values """
+
     Pickled = 1
     String = 2
     Npy = 3
@@ -152,7 +154,6 @@ class ResultTable(Base):
             stage=self.stage,
             data=data,
             time=self.time,
-            saved_in_hdf5=self.saved_in_hdf5,
         )
 
     @staticmethod
@@ -179,6 +180,7 @@ class MetadataTable(Base):
     time = Column(DATETIME, nullable=False)
     data = Column(BLOB)
     data_type = Column(Enum(ResultDataType))
+    saved_in_hdf5 = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
         return f"<Metadata(id='{self.id}')>"
