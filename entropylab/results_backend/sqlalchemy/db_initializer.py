@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import TypeVar, Type
 
 from alembic import script, command
 from alembic.config import Config
@@ -9,10 +10,12 @@ import sqlalchemy.engine
 from sqlalchemy.orm import sessionmaker
 
 from entropylab.logger import logger
-from entropylab.results_backend.sqlalchemy.model import Base, ResultTable
-from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB
+from entropylab.results_backend.sqlalchemy.model import Base, ResultTable, MetadataTable
+from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB, EntityType
 
 _SQL_ALCHEMY_MEMORY = ":memory:"
+
+T = TypeVar("T", bound=Base)
 
 
 class _DbInitializer:
@@ -40,6 +43,7 @@ class _DbInitializer:
     def upgrade_db(self) -> None:
         self._alembic_upgrade()
         self._migrate_results_to_hdf5()
+        self._migrate_metadata_to_hdf5()
 
     @staticmethod
     def __create_parent_dirs(path) -> None:
@@ -92,23 +96,27 @@ class _DbInitializer:
         alembic_cfg.attributes["connection"] = connection  # overrides dummy url above
         return alembic_cfg
 
-    def _migrate_results_to_hdf5(self):
-        logger.debug("Migrating results from sqlite to hdf5")
+    def _migrate_results_to_hdf5(self) -> None:
+        self._migrate_rows_to_hdf5(EntityType.RESULT, ResultTable)
+
+    def _migrate_metadata_to_hdf5(self) -> None:
+        self._migrate_rows_to_hdf5(EntityType.METADATA, MetadataTable)
+
+    def _migrate_rows_to_hdf5(self, entity_type: EntityType, table: Type[T]):
+        logger.debug(f"Migrating {entity_type.name} rows from sqlite to hdf5")
         results_db = HDF5ResultsDB()
         session_maker = sessionmaker(bind=self._engine)
         with session_maker() as session:
-            results = (
-                session.query(ResultTable)
-                .filter(ResultTable.saved_in_hdf5.is_(False))
-                .all()
-            )
-            if len(results) == 0:
-                logger.debug("No results need migrating. Done")
+            rows = session.query(table).filter(table.saved_in_hdf5.is_(False)).all()
+            if len(rows) == 0:
+                logger.debug(f"No {entity_type.name} rows need migrating. Done")
             else:
-                logger.debug(f"Found {len(results)} results to migrate")
-                results_db.migrate_result_records(results)
-                logger.debug(f"Migrated {len(results)} to hdf5")
-                for result in results:
-                    result.saved_in_hdf5 = True
+                logger.debug(f"Found {len(rows)} {entity_type.name} rows to migrate")
+                results_db._migrate_rows(entity_type, rows)
+                logger.debug(f"Migrated {len(rows)} {entity_type.name} to hdf5")
+                for row in rows:
+                    row.saved_in_hdf5 = True
                 session.commit()
-                logger.debug("Marked results in sqlite as `saved_in_hdf5`. Done")
+                logger.debug(
+                    f"Marked all {entity_type.name} rows in sqlite as `saved_in_hdf5`. Done"
+                )

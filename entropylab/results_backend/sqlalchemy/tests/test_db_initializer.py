@@ -63,9 +63,38 @@ def test__migrate_results_to_hdf5(request):
         target._migrate_results_to_hdf5()
         # assert
         results_db = HDF5ResultsDB()
-        hdf5_results = results_db.get_results()
+        hdf5_results = results_db.get_result_records()
         assert len(list(hdf5_results)) == 5
         cur = target._engine.execute("SELECT * FROM Results WHERE saved_in_hdf5 = 1")
+        res = cur.all()
+        assert len(res) == 5
+    finally:
+        # clean up
+        _delete_if_exists(HDF_FILENAME)
+        _delete_if_exists(path)
+
+
+def test__migrate_metadata_to_hdf5(request):
+    # arrange
+    path = f"./tests_cache/{request.node.name}.db"
+    try:
+        db = SqlAlchemyDB(path, echo=True)
+        db.__SAVE_RESULTS_IN_HDF5 = False
+        db.save_metadata(1, RawResultData(stage=1, label="foo", data="bar"))
+        db.save_metadata(1, RawResultData(stage=1, label="baz", data="buz"))
+        db.save_metadata(1, RawResultData(stage=2, label="biz", data="bez"))
+        db.save_metadata(2, RawResultData(stage=1, label="bat", data="bot"))
+        db.save_metadata(3, RawResultData(stage=1, label="ooh", data="aah"))
+        target = _DbInitializer(path, echo=True)
+        # act
+        target._migrate_metadata_to_hdf5()
+        # assert
+        results_db = HDF5ResultsDB()
+        hdf5_metadata = results_db.get_metadata_records()
+        assert len(list(hdf5_metadata)) == 5
+        cur = target._engine.execute(
+            "SELECT * FROM ExperimentMetadata WHERE saved_in_hdf5 = 1"
+        )
         res = cur.all()
         assert len(res) == 5
     finally:

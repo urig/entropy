@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime
 from typing import List, TypeVar, Optional, ContextManager, Iterable, Union, Any
 from typing import Set
@@ -7,7 +6,7 @@ from typing import Set
 import jsonpickle
 import pandas as pd
 from pandas import DataFrame
-from sqlalchemy import create_engine, desc
+from sqlalchemy import desc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import Selectable
@@ -103,6 +102,11 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
             try:
                 HDF5ResultsDB().save_result(experiment_id, result)
                 saved_in_hdf5 = True
+            except ValueError as ex:
+                raise ValueError(
+                    f"Result already exists (experiment_id='{experiment_id}', "
+                    f"stage='{result.stage}', label='{result.label}'"
+                ) from ex
             except Exception:
                 logging.exception("Error saving result to HDF5")
                 saved_in_hdf5 = False
@@ -111,7 +115,25 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         return self._execute_transaction(transaction)
 
     def save_metadata(self, experiment_id: int, metadata: Metadata):
+        if metadata.label is None:
+            raise TypeError("metadata.label cannot be None")
+        if metadata.label == "":
+            raise ValueError("metadata.label cannot be empty")
+        saved_in_hdf5 = False
+        if self.__SAVE_RESULTS_IN_HDF5:
+            try:
+                HDF5ResultsDB().save_metadata(experiment_id, metadata)
+                saved_in_hdf5 = True
+            except ValueError as ex:
+                raise ValueError(
+                    f"Metadata already exists (experiment_id='{experiment_id}', "
+                    f"stage='{metadata.stage}', label='{metadata.label}'"
+                ) from ex
+            except Exception:
+                logging.exception("Error saving metadata to HDF5.")
+                saved_in_hdf5 = False
         transaction = MetadataTable.from_model(experiment_id, metadata)
+        transaction.saved_in_hdf5 = saved_in_hdf5
         return self._execute_transaction(transaction)
 
     def save_debug(self, experiment_id: int, debug: Debug):
@@ -171,7 +193,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if not self.__SAVE_RESULTS_IN_HDF5:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
         else:
-            return HDF5ResultsDB().get_results(experiment_id, stage, label)
+            return HDF5ResultsDB().get_result_records(experiment_id, stage, label)
         pass
 
     def __get_results_from_sqlalchemy(

@@ -19,7 +19,7 @@ def test_ctor_creates_up_to_date_schema_when_in_memory(path: str):
 
 
 @pytest.mark.parametrize(
-    "db_template, expected_to_throw",
+    "db_template, expected_to_raise",
     [
         (None, False),  # new db
         ("./db_templates/empty.db", False),  # existing but empty
@@ -27,7 +27,7 @@ def test_ctor_creates_up_to_date_schema_when_in_memory(path: str):
         ("./db_templates/with_saved_in_hdf5_col.db", False),  # revision 04ae19b32c08
     ],
 )
-def test_ctor_ensures_latest_migration(db_template: str, expected_to_throw: bool):
+def test_ctor_ensures_latest_migration(db_template: str, expected_to_raise: bool):
     # arrange
     if db_template is not None:
         db_under_test = _get_test_file_name(db_template)
@@ -35,7 +35,7 @@ def test_ctor_ensures_latest_migration(db_template: str, expected_to_throw: bool
     else:
         db_under_test = _get_test_file_name("tests_cache/new.db")
     try:
-        if expected_to_throw:
+        if expected_to_raise:
             with pytest.raises(Exception):
                 # act & assert
                 SqlAlchemyDB(path=db_under_test, echo=True)

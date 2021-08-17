@@ -65,13 +65,15 @@ def test_write_and_read_single_result(data: Any):
 
         # act
         target.save_result(experiment_id, result)
-        actual = list(target.get_results(experiment_id, result.stage, result.label))[0]
+        actual = list(
+            target.get_result_records(experiment_id, result.stage, result.label)
+        )[0]
 
         # assert
         if isinstance(data, list) or isinstance(data, tuple):
-            assert_lists_are_equal(actual.data, data)
+            _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, np.ndarray):
-            assert_lists_are_equal(actual.data, data)
+            _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
                 "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
@@ -121,9 +123,9 @@ def test_write_and_read_single_metadata(data: Any):
 
         # assert
         if isinstance(data, list) or isinstance(data, tuple):
-            assert_lists_are_equal(actual.data, data)
+            _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, np.ndarray):
-            assert_lists_are_equal(actual.data, data)
+            _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
                 "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
@@ -149,7 +151,7 @@ def test_get_results_two_items():
         target.save_result(experiment_id, result2)
 
         # act
-        actual = list(target.get_results(experiment_id, result.stage))
+        actual = list(target.get_result_records(experiment_id, result.stage))
 
         # assert
         assert len(actual) == 2
@@ -302,6 +304,6 @@ def test_get_children_or_by_name_when_group_is_empty(request):
         os.remove(filename)
 
 
-def assert_lists_are_equal(actual, expected):
+def _assert_lists_are_equal(actual, expected):
     assert len(actual) == len(expected)
     assert all([a == b for a, b in zip(actual, expected)])

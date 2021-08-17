@@ -173,14 +173,14 @@ class HDF5ResultsDB:
         try:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
-            data_type, pickled = self.__pickle_data(data)
+            data_type, pickled = self._pickle_data(data)
             # TODO: Why ascii? Why string_dtype? Maybe just save bytes...
             dtype = h5py.string_dtype(encoding="ascii", length=len(pickled))
             dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
             dset.attrs.create("data_type", data_type.value, dtype="i2")
         return dset
 
-    def __pickle_data(self, data: Any):
+    def _pickle_data(self, data: Any):
         try:
             pickled = pickle.dumps(data)
             data_type = ResultDataType.Pickled
@@ -189,23 +189,21 @@ class HDF5ResultsDB:
             data_type = ResultDataType.String
         return data_type, pickled
 
-    def migrate_result_records(self, records: Iterable[ResultTable]) -> None:
-        self._migrate_entities(EntityType.RESULT, records)
+    def migrate_result_rows(self, rows: Iterable[ResultTable]) -> None:
+        self._migrate_rows(EntityType.RESULT, rows)
 
-    def migrate_metadata_records(self, records: Iterable[Metadata]) -> None:
-        self._migrate_entities(EntityType.METADATA, records)
+    def migrate_metadata_rows(self, rows: Iterable[Metadata]) -> None:
+        self._migrate_rows(EntityType.METADATA, rows)
 
-    def _migrate_entities(
-        self, entity_type: EntityType, sql_entities: Iterable[T]
-    ) -> None:
-        if sql_entities is not None and len(sql_entities) > 0:
+    def _migrate_rows(self, entity_type: EntityType, rows: Iterable[T]) -> None:
+        if rows is not None and len(rows) > 0:
             with h5py.File(HDF_FILENAME, "a") as file:
-                for sql_entity in sql_entities:
-                    if not sql_entity.saved_in_hdf5:
-                        record = sql_entity.to_record()
+                for row in rows:
+                    if not row.saved_in_hdf5:
+                        record = row.to_record()
                         hdf5_id = self._migrate_record(file, entity_type, record)
                         logger.debug(
-                            f"Migrated ${entity_type.name} with id [{sql_entity.id}] to HDF5 with id [{hdf5_id}]"
+                            f"Migrated ${entity_type.name} with id [{row.id}] to HDF5 with id [{hdf5_id}]"
                         )
 
     def _migrate_record(
@@ -218,8 +216,8 @@ class HDF5ResultsDB:
             result_record.stage,
             result_record.label,
             result_record.data,
-            result_record.story,
             result_record.time,
+            result_record.story,
             result_record.id,
         )
 
@@ -265,7 +263,7 @@ class HDF5ResultsDB:
             logger.exception("FileNotFoundError in get_experiment_entities()")
             return dsets
 
-    def get_results(
+    def get_result_records(
         self,
         experiment_id: Optional[int] = None,
         stage: Optional[int] = None,
@@ -291,7 +289,7 @@ class HDF5ResultsDB:
     def get_last_result_of_experiment(
         self, experiment_id: int
     ) -> Optional[ResultRecord]:
-        results = list(self.get_results(experiment_id, None, None))
+        results = list(self.get_result_records(experiment_id, None, None))
         if results and len(results) > 0:
             results.sort(key=lambda x: x.time, reverse=True)
             return results[0]
