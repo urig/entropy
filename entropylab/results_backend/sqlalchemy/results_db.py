@@ -189,34 +189,24 @@ class HDF5ResultsDB:
             data_type = ResultDataType.String
         return data_type, pickled
 
-    def migrate_result_records(self, records: Iterable[ResultTable]) -> list[int]:
-        return self._migrate_entities(EntityType.RESULT, records)
+    def migrate_result_records(self, records: Iterable[ResultTable]) -> None:
+        self._migrate_entities(EntityType.RESULT, records)
 
-    def migrate_metadata_records(self, records: Iterable[Metadata]) -> list[int]:
-        return self._migrate_entities(EntityType.METADATA, records)
+    def migrate_metadata_records(self, records: Iterable[Metadata]) -> None:
+        self._migrate_entities(EntityType.METADATA, records)
 
     def _migrate_entities(
         self, entity_type: EntityType, sql_entities: Iterable[T]
-    ) -> list[int]:
-        # TODO: Add docstring
-        if sql_entities is None:
-            return []
-        with h5py.File(HDF_FILENAME, "a") as file:
-            sqlalchemy_ids = []
-            for sql_entity in sql_entities:
-                if not sql_entity.saved_in_hdf5:
-                    try:
+    ) -> None:
+        if sql_entities is not None and len(sql_entities) > 0:
+            with h5py.File(HDF_FILENAME, "a") as file:
+                for sql_entity in sql_entities:
+                    if not sql_entity.saved_in_hdf5:
                         record = sql_entity.to_record()
                         hdf5_id = self._migrate_record(file, entity_type, record)
-                        sqlalchemy_ids.append(sql_entity.id)
                         logger.debug(
                             f"Migrated ${entity_type.name} with id [{sql_entity.id}] to HDF5 with id [{hdf5_id}]"
                         )
-                    except Exception:
-                        logger.exception(
-                            f"Failed to migrate ${entity_type.name} with id [{sql_entity.id}] to HDF5"
-                        )
-            return sqlalchemy_ids
 
     def _migrate_record(
         self, file: h5py.File, entity_type: EntityType, result_record: T
