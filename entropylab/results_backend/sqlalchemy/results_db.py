@@ -189,26 +189,49 @@ class HDF5ResultsDB:
             data_type = ResultDataType.String
         return data_type, pickled
 
-    def migrate_result_records(self, results: Iterable[ResultTable]) -> list[int]:
+    def migrate_result_records(self, records: Iterable[ResultTable]) -> list[int]:
+        return self._migrate_entities(EntityType.RESULT, records)
+
+    def migrate_metadata_records(self, records: Iterable[Metadata]) -> list[int]:
+        return self._migrate_entities(EntityType.METADATA, records)
+
+    def _migrate_entities(
+        self, entity_type: EntityType, sql_entities: Iterable[T]
+    ) -> list[int]:
         # TODO: Add docstring
-        if results is None:
+        if sql_entities is None:
             return []
         with h5py.File(HDF_FILENAME, "a") as file:
             sqlalchemy_ids = []
-            for result in results:
-                if not result.saved_in_hdf5:
+            for sql_entity in sql_entities:
+                if not sql_entity.saved_in_hdf5:
                     try:
-                        result_record = result.to_record()
-                        hdf5_id = self._migrate_result_record(file, result_record)
-                        sqlalchemy_ids.append(result.id)
+                        record = sql_entity.to_record()
+                        hdf5_id = self._migrate_record(file, entity_type, record)
+                        sqlalchemy_ids.append(sql_entity.id)
                         logger.debug(
-                            f"Migrated result with id [{result.id}] to HDF5 with id [{hdf5_id}]"
+                            f"Migrated ${entity_type.name} with id [{sql_entity.id}] to HDF5 with id [{hdf5_id}]"
                         )
                     except Exception:
                         logger.exception(
-                            f"Failed to migrate result with id [{result.id}] to HDF5"
+                            f"Failed to migrate ${entity_type.name} with id [{sql_entity.id}] to HDF5"
                         )
             return sqlalchemy_ids
+
+    def _migrate_record(
+        self, file: h5py.File, entity_type: EntityType, result_record: T
+    ) -> str:
+        return self._save_entity_to_file(
+            file,
+            entity_type,
+            result_record.experiment_id,
+            result_record.stage,
+            result_record.label,
+            result_record.data,
+            result_record.story,
+            result_record.time,
+            result_record.id,
+        )
 
     def _migrate_result_record(
         self, file: h5py.File, result_record: ResultRecord
