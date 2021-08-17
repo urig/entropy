@@ -115,26 +115,28 @@ def test_write_and_read_single_metadata(data: Any):
 
         # act
         target.save_metadata(experiment_id, metadata)
-        # actual = list(target.get_results(experiment_id, metadata.stage, metadata.label))[0]
-        #
-        # # assert
-        # if isinstance(data, list) or isinstance(data, tuple):
-        #     assert_lists_are_equal(actual.data, data)
-        # elif isinstance(data, np.ndarray):
-        #     assert_lists_are_equal(actual.data, data)
-        # elif isinstance(data, UnPicklable):
-        #     assert str(actual.data).startswith(
-        #         "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
-        #     )
-        # else:
-        #     assert actual.data == data
+        actual = list(
+            target.get_metadata_records(experiment_id, metadata.stage, metadata.label)
+        )[0]
+
+        # assert
+        if isinstance(data, list) or isinstance(data, tuple):
+            assert_lists_are_equal(actual.data, data)
+        elif isinstance(data, np.ndarray):
+            assert_lists_are_equal(actual.data, data)
+        elif isinstance(data, UnPicklable):
+            assert str(actual.data).startswith(
+                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
+            )
+        else:
+            assert actual.data == data
 
     finally:
         # clean up
         os.remove(HDF_FILENAME)
 
 
-def test_get_results_two_results():
+def test_get_results_two_items():
     target = HDF5ResultsDB()
     try:
         # arrange
@@ -148,6 +150,29 @@ def test_get_results_two_results():
 
         # act
         actual = list(target.get_results(experiment_id, result.stage))
+
+        # assert
+        assert len(actual) == 2
+        assert actual[0].label == "bar"
+        assert actual[1].label == "foo"
+
+    finally:
+        # clean up
+        os.remove(HDF_FILENAME)
+
+
+def test_get_metadata_two_items():
+    target = HDF5ResultsDB()
+    try:
+        # arrange
+        experiment_id = randrange(10000000)
+        result = Metadata(stage=0, label="foo", data=np.arange(12))
+        target.save_metadata(experiment_id, result)
+        result2 = Metadata(stage=0, label="bar", data=np.arange(9))
+        target.save_metadata(experiment_id, result2)
+
+        # act
+        actual = list(target.get_metadata_records(experiment_id, result.stage))
 
         # assert
         assert len(actual) == 2

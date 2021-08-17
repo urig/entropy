@@ -34,7 +34,9 @@ def _label_from(dset: h5py.Dataset) -> str:
 
 
 def _story_from(dset: h5py.Dataset) -> str:
-    return dset.attrs["story"]
+    if "story" in dset.attrs:
+        return dset.attrs["story"]
+    return ""
 
 
 def _data_from(dset: h5py.Dataset) -> Any:
@@ -60,6 +62,18 @@ def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
         id=0,  # id_from(dset),
         label=_label_from(dset),
         story=_story_from(dset),
+        stage=_stage_from(dset),
+        data=_data_from(dset),
+        time=_time_from(dset),
+    )
+
+
+def _build_metadata_record(dset: h5py.Dataset) -> Metadata:
+    return MetadataRecord(
+        experiment_id=_experiment_from(dset),
+        # TODO: Get confirmation to change id to string
+        id=0,  # id_from(dset),
+        label=_label_from(dset),
         stage=_stage_from(dset),
         data=_data_from(dset),
         time=_time_from(dset),
@@ -106,10 +120,10 @@ class HDF5ResultsDB:
         with h5py.File(HDF_FILENAME, "a") as file:
             return self._save_entity_to_file(
                 file,
+                EntityType.RESULT,
                 experiment_id,
                 result.stage,
                 result.label,
-                EntityType.RESULT,
                 result.data,
                 datetime.now(),
                 result.story,
@@ -119,10 +133,10 @@ class HDF5ResultsDB:
         with h5py.File(HDF_FILENAME, "a") as file:
             return self._save_entity_to_file(
                 file,
+                EntityType.METADATA,
                 experiment_id,
                 metadata.stage,
                 metadata.label,
-                EntityType.METADATA,
                 metadata.data,
                 datetime.now(),
             )
@@ -130,10 +144,10 @@ class HDF5ResultsDB:
     def _save_entity_to_file(
         self,
         file: h5py.File,
+        entity_type: EntityType,
         experiment_id: int,
         stage: int,
         label: str,
-        entity_type: EntityType,
         data: Any,
         time: datetime,
         story: Optional[str] = None,
@@ -201,17 +215,17 @@ class HDF5ResultsDB:
     ) -> str:
         return self._save_entity_to_file(
             file,
+            EntityType.RESULT,
             result_record.experiment_id,
             result_record.stage,
             result_record.label,
-            EntityType.RESULT,
             result_record.data,
             result_record.story,
             result_record.time,
             result_record.id,
         )
 
-    def get_experiment_entities(
+    def _get_experiment_entities(
         self,
         entity_type: EntityType,
         convert_from_dset: Callable,
@@ -244,37 +258,21 @@ class HDF5ResultsDB:
         stage: Optional[int] = None,
         label: Optional[str] = None,
     ) -> Iterable[ResultRecord]:
-        """
-        Retrieves ResultRecords from HDF5.
-        """
-        entities = self.get_experiment_entities(
+        entities = self._get_experiment_entities(
             EntityType.RESULT, _build_result_record, experiment_id, stage, label
         )
         return entities
-        # result = []
-        # try:
-        #     with h5py.File(HDF_FILENAME, "r") as file:
-        #         top_group = file["experiments"]
-        #         exp_groups = _get_all_or_single(top_group, experiment_id)
-        #         for exp_group in exp_groups:
-        #             stage_groups = _get_all_or_single(exp_group, stage)
-        #             for stage_group in stage_groups:
-        #                 label_groups = _get_all_or_single(stage_group, label)
-        #                 for label_group in label_groups:
-        #                     dset_name = EntityType.RESULT.name.lower()
-        #                     result.append(_build_result_record(label_group[dset_name]))
-        #     return result
-        # except FileNotFoundError:
-        #     # TODO: Log input args:
-        #     logger.exception("FileNotFoundError in get_results()")
-        #     return result
 
     def get_metadata_records(
         self,
         experiment_id: Optional[int] = None,
-        label: Optional[str] = None,
         stage: Optional[int] = None,
+        label: Optional[str] = None,
     ) -> Iterable[MetadataRecord]:
+        entities = self._get_experiment_entities(
+            EntityType.METADATA, _build_metadata_record, experiment_id, stage, label
+        )
+        return entities
         pass
 
     def get_last_result_of_experiment(
