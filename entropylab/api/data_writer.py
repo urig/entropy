@@ -7,7 +7,7 @@ from bokeh.models import Renderer
 from bokeh.plotting import Figure
 from matplotlib.figure import Figure as matplotlibFigure
 
-
+# TODO check where we save the snapshot(in the end)
 @dataclass
 class ExperimentInitialData:
     """
@@ -16,7 +16,7 @@ class ExperimentInitialData:
 
     label: str
     user: str
-    lab_topology: str
+    resources_snapshot: str
     script: str
     start_time: datetime
     story: str = None
