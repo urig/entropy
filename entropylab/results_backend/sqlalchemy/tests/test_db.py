@@ -4,12 +4,11 @@ import pytest
 
 from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
-from entropylab.results_backend.sqlalchemy.storage import HDF_FILENAME
 
 
 def test_save_result_raises_when_same_result_saved_twice(request):
     # arrange
-    settings.toggles = {"hdf5_storage": False}  # this feature is new in HDF5Storage
+    settings.toggles = {"hdf5_storage": True}  # this feature is new in HDF5Storage
     path = f"./tests_cache/{request.node.name}.db"
     try:
         db = SqlAlchemyDB(path, echo=True)
@@ -20,7 +19,7 @@ def test_save_result_raises_when_same_result_saved_twice(request):
             db.save_result(0, raw_result)
     finally:
         # clean up
-        _delete_if_exists(HDF_FILENAME)
+        _delete_if_exists("./entropy.hdf5")
         _delete_if_exists(path)
 
 

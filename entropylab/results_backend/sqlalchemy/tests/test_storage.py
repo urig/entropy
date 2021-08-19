@@ -10,10 +10,12 @@ from entropylab import RawResultData
 from entropylab.api.data_writer import Metadata
 from entropylab.results_backend.sqlalchemy.storage import (
     HDF5Storage,
-    HDF_FILENAME,
     _get_all_or_single,
 )
 from entropylab.results_backend.sqlalchemy.model import ResultDataType
+
+
+HDF_FILENAME = "./entropy.hdf5"
 
 
 class Picklable(object):
@@ -55,7 +57,7 @@ class UnPicklable(object):
     ],
 )
 def test_write_and_read_single_result(data: Any):
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -108,7 +110,7 @@ def test_write_and_read_single_result(data: Any):
     ],
 )
 def test_write_and_read_single_metadata(data: Any):
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -139,7 +141,7 @@ def test_write_and_read_single_metadata(data: Any):
 
 
 def test_get_results_two_items():
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -164,7 +166,7 @@ def test_get_results_two_items():
 
 
 def test_get_metadata_two_items():
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -187,7 +189,7 @@ def test_get_metadata_two_items():
 
 
 def test_get_last_result_of_experiment():
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -213,7 +215,7 @@ def test_get_last_result_of_experiment():
 
 
 def test_get_last_result_of_experiment_when_no_file():
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     # arrange
     experiment_id = randrange(10000000)
     result = RawResultData(stage=0, label="foo", data=np.arange(12))
@@ -227,7 +229,7 @@ def test_get_last_result_of_experiment_when_no_file():
 
 
 def test_get_last_result_of_experiment_when_no_experiment():
-    target = HDF5Storage()
+    target = HDF5Storage(HDF_FILENAME)
     try:
         # arrange
         experiment_id = randrange(10000000)

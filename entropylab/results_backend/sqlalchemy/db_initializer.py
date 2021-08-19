@@ -17,6 +17,8 @@ _SQL_ALCHEMY_MEMORY = ":memory:"
 
 T = TypeVar("T", bound=Base)
 
+HDF_FILENAME = "./entropy.hdf5"
+
 
 class _DbInitializer:
     def __init__(self, path: str, echo=False):
@@ -104,7 +106,7 @@ class _DbInitializer:
 
     def _migrate_rows_to_hdf5(self, entity_type: EntityType, table: Type[T]):
         logger.debug(f"Migrating {entity_type.name} rows from sqlite to hdf5")
-        results_db = HDF5Storage()
+        results_db = HDF5Storage(HDF_FILENAME)
         session_maker = sessionmaker(bind=self._engine)
         with session_maker() as session:
             rows = session.query(table).filter(table.saved_in_hdf5.is_(False)).all()

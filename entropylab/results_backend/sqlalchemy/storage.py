@@ -15,8 +15,6 @@ from entropylab.results_backend.sqlalchemy.model import (
     Base,
 )
 
-# TODO: Inject via __init__() (to be read from config above)
-HDF_FILENAME = "./entropy.hdf5"
 
 T = TypeVar("T", bound=Base)
 R = TypeVar("R", ResultRecord, MetadataRecord)
@@ -124,7 +122,7 @@ class HDF5Reader:
     ) -> Iterable[T]:
         dsets = []
         try:
-            with h5py.File(HDF_FILENAME, "r") as file:
+            with h5py.File(self._path, "r") as file:
                 top_group = file["experiments"]
                 exp_groups = _get_all_or_single(top_group, experiment_id)
                 for exp_group in exp_groups:
@@ -177,7 +175,7 @@ class HDF5Reader:
 
 class HDF5Writer:
     def save_result(self, experiment_id: int, result: RawResultData) -> str:
-        with h5py.File(HDF_FILENAME, "a") as file:
+        with h5py.File(self._path, "a") as file:
             return self._save_entity_to_file(
                 file,
                 EntityType.RESULT,
@@ -190,7 +188,7 @@ class HDF5Writer:
             )
 
     def save_metadata(self, experiment_id: int, metadata: Metadata):
-        with h5py.File(HDF_FILENAME, "a") as file:
+        with h5py.File(self._path, "a") as file:
             return self._save_entity_to_file(
                 file,
                 EntityType.METADATA,
@@ -238,6 +236,8 @@ class HDF5Writer:
             dtype = h5py.string_dtype(encoding="ascii", length=len(pickled))
             dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
             dset.attrs.create("data_type", data_type.value, dtype="i2")
+        except ValueError as ex:
+            raise
         return dset
 
     @staticmethod
@@ -262,7 +262,7 @@ class HDF5Migrator(HDF5Writer):
 
     def _migrate_rows(self, entity_type: EntityType, rows: Iterable[T]) -> None:
         if rows is not None and len(list(rows)) > 0:
-            with h5py.File(HDF_FILENAME, "a") as file:
+            with h5py.File(self._path, "a") as file:
                 for row in rows:
                     if not row.saved_in_hdf5:
                         record = row.to_record()
@@ -303,10 +303,17 @@ class HDF5Migrator(HDF5Writer):
 
 
 class HDF5Storage(HDF5Reader, HDF5Migrator, HDF5Writer):
-    def __init__(self):
+    def __init__(self, path=None):
+        if path is None or path == "":
+            self._path = self._get_temporary_filename()
+        else:
+            self._path = path
         self._check_file_permissions()
 
-    @staticmethod
-    def _check_file_permissions():
-        file = h5py.File(HDF_FILENAME, "a")
+    def _check_file_permissions(self):
+        file = h5py.File(self._path, "a")
         file.close()
+
+    @staticmethod
+    def _get_temporary_filename():
+        return f"./entropy_{datetime.now():%Y-%m-%d-%H-%M-%S}.hdf5"
