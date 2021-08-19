@@ -296,8 +296,8 @@ class HDF5Migrator(HDF5Writer):
             result_record.stage,
             result_record.label,
             result_record.data,
-            result_record.story,
             result_record.time,
+            result_record.story,
             result_record.id,
         )
 
