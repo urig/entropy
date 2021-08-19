@@ -73,7 +73,7 @@ def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     )
 
 
-def _build_metadata_record(dset: h5py.Dataset) -> Metadata:
+def _build_metadata_record(dset: h5py.Dataset) -> MetadataRecord:
     return MetadataRecord(
         experiment_id=_experiment_from(dset),
         # TODO: Get confirmation to change id to string
@@ -261,7 +261,7 @@ class HDF5Migrator(HDF5Writer):
         self._migrate_rows(EntityType.METADATA, rows)
 
     def _migrate_rows(self, entity_type: EntityType, rows: Iterable[T]) -> None:
-        if rows is not None and len(rows) > 0:
+        if rows is not None and len(list(rows)) > 0:
             with h5py.File(HDF_FILENAME, "a") as file:
                 for row in rows:
                     if not row.saved_in_hdf5:
@@ -282,7 +282,7 @@ class HDF5Migrator(HDF5Writer):
             record.label,
             record.data,
             record.time,
-            record.story,
+            getattr(record, "story", None),
             record.id,
         )
 
