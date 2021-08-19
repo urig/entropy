@@ -36,7 +36,7 @@ from entropylab.instruments.lab_topology import (
     DriverType,
     ResourceRecord,
 )
-from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB
+from entropylab.results_backend.sqlalchemy.storage import HDF5Storage
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 from entropylab.results_backend.sqlalchemy.lab_model import (
     Resources,
@@ -100,7 +100,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         saved_in_hdf5 = False
         if self.__SAVE_RESULTS_IN_HDF5:
             try:
-                HDF5ResultsDB().save_result(experiment_id, result)
+                HDF5Storage().save_result(experiment_id, result)
                 saved_in_hdf5 = True
             except ValueError as ex:
                 raise ValueError(
@@ -122,7 +122,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         saved_in_hdf5 = False
         if self.__SAVE_RESULTS_IN_HDF5:
             try:
-                HDF5ResultsDB().save_metadata(experiment_id, metadata)
+                HDF5Storage().save_metadata(experiment_id, metadata)
                 saved_in_hdf5 = True
             except ValueError as ex:
                 raise ValueError(
@@ -193,7 +193,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if not self.__SAVE_RESULTS_IN_HDF5:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
         else:
-            return HDF5ResultsDB().get_result_records(experiment_id, stage, label)
+            return HDF5Storage().get_result_records(experiment_id, stage, label)
         pass
 
     def __get_results_from_sqlalchemy(

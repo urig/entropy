@@ -3,7 +3,7 @@ import os
 import pytest
 
 from entropylab import SqlAlchemyDB, RawResultData
-from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME
+from entropylab.results_backend.sqlalchemy.storage import HDF_FILENAME
 
 
 def test_save_result_raises_when_same_result_saved_twice(request):

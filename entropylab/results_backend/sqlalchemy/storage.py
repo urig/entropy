@@ -302,8 +302,7 @@ class HDF5Migrator(HDF5Writer):
         )
 
 
-# TODO: Rename to HDF5DB
-class HDF5ResultsDB(HDF5Reader, HDF5Migrator, HDF5Writer):
+class HDF5Storage(HDF5Reader, HDF5Migrator, HDF5Writer):
     def __init__(self):
         self._check_file_permissions()
 

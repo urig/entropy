@@ -3,7 +3,7 @@ from datetime import datetime
 from shutil import copyfile
 
 from entropylab import SqlAlchemyDB, RawResultData
-from entropylab.results_backend.sqlalchemy.results_db import HDF_FILENAME, HDF5ResultsDB
+from entropylab.results_backend.sqlalchemy.storage import HDF_FILENAME, HDF5Storage
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
 
@@ -62,7 +62,7 @@ def test__migrate_results_to_hdf5(request):
         # act
         target._migrate_results_to_hdf5()
         # assert
-        results_db = HDF5ResultsDB()
+        results_db = HDF5Storage()
         hdf5_results = results_db.get_result_records()
         assert len(list(hdf5_results)) == 5
         cur = target._engine.execute("SELECT * FROM Results WHERE saved_in_hdf5 = 1")
@@ -89,7 +89,7 @@ def test__migrate_metadata_to_hdf5(request):
         # act
         target._migrate_metadata_to_hdf5()
         # assert
-        results_db = HDF5ResultsDB()
+        results_db = HDF5Storage()
         hdf5_metadata = results_db.get_metadata_records()
         assert len(list(hdf5_metadata)) == 5
         cur = target._engine.execute(

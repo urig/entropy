@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from entropylab.logger import logger
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable, MetadataTable
-from entropylab.results_backend.sqlalchemy.results_db import HDF5ResultsDB, EntityType
+from entropylab.results_backend.sqlalchemy.storage import HDF5Storage, EntityType
 
 _SQL_ALCHEMY_MEMORY = ":memory:"
 
@@ -104,7 +104,7 @@ class _DbInitializer:
 
     def _migrate_rows_to_hdf5(self, entity_type: EntityType, table: Type[T]):
         logger.debug(f"Migrating {entity_type.name} rows from sqlite to hdf5")
-        results_db = HDF5ResultsDB()
+        results_db = HDF5Storage()
         session_maker = sessionmaker(bind=self._engine)
         with session_maker() as session:
             rows = session.query(table).filter(table.saved_in_hdf5.is_(False)).all()

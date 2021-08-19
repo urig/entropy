@@ -8,8 +8,8 @@ import pytest
 
 from entropylab import RawResultData
 from entropylab.api.data_writer import Metadata
-from entropylab.results_backend.sqlalchemy.results_db import (
-    HDF5ResultsDB,
+from entropylab.results_backend.sqlalchemy.storage import (
+    HDF5Storage,
     HDF_FILENAME,
     _get_all_or_single,
 )
@@ -55,7 +55,7 @@ class UnPicklable(object):
     ],
 )
 def test_write_and_read_single_result(data: Any):
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -76,7 +76,7 @@ def test_write_and_read_single_result(data: Any):
             _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
-                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
+                "<entropylab.results_backend.sqlalchemy.tests.test_storage.UnPicklable"
             )
         else:
             assert actual.data == data
@@ -108,7 +108,7 @@ def test_write_and_read_single_result(data: Any):
     ],
 )
 def test_write_and_read_single_metadata(data: Any):
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -128,7 +128,7 @@ def test_write_and_read_single_metadata(data: Any):
             _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
-                "<entropylab.results_backend.sqlalchemy.tests.test_results_db.UnPicklable"
+                "<entropylab.results_backend.sqlalchemy.tests.test_storage.UnPicklable"
             )
         else:
             assert actual.data == data
@@ -139,7 +139,7 @@ def test_write_and_read_single_metadata(data: Any):
 
 
 def test_get_results_two_items():
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -164,7 +164,7 @@ def test_get_results_two_items():
 
 
 def test_get_metadata_two_items():
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -187,7 +187,7 @@ def test_get_metadata_two_items():
 
 
 def test_get_last_result_of_experiment():
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
@@ -213,7 +213,7 @@ def test_get_last_result_of_experiment():
 
 
 def test_get_last_result_of_experiment_when_no_file():
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     # arrange
     experiment_id = randrange(10000000)
     result = RawResultData(stage=0, label="foo", data=np.arange(12))
@@ -227,7 +227,7 @@ def test_get_last_result_of_experiment_when_no_file():
 
 
 def test_get_last_result_of_experiment_when_no_experiment():
-    target = HDF5ResultsDB()
+    target = HDF5Storage()
     try:
         # arrange
         experiment_id = randrange(10000000)
