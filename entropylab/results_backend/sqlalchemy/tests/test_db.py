@@ -2,16 +2,17 @@ import os
 
 import pytest
 
+from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
 from entropylab.results_backend.sqlalchemy.storage import HDF_FILENAME
 
 
 def test_save_result_raises_when_same_result_saved_twice(request):
     # arrange
+    settings.toggles = {"hdf5_storage": False}  # this feature is new in HDF5Storage
     path = f"./tests_cache/{request.node.name}.db"
     try:
         db = SqlAlchemyDB(path, echo=True)
-        db.__SAVE_RESULTS_IN_HDF5 = True
         raw_result = RawResultData(stage=1, label="foo", data=42)
         db.save_result(0, raw_result)
         with pytest.raises(ValueError):

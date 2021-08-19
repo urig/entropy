@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import Selectable
 from sqlalchemy.util.compat import contextmanager
 
+from config import settings
 from entropylab.api.data_reader import (
     DataReader,
     ExperimentRecord,
@@ -63,8 +64,6 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
      and DataReader) and lab resources (PersistentLabDB)
     """
 
-    __SAVE_RESULTS_IN_HDF5 = True
-
     def __init__(self, path=None, echo=False):
         """
             Database implementation using SqlAlchemy package for results (DataWriter
@@ -98,7 +97,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if result.label == "":
             raise ValueError("result.label cannot be empty")
         saved_in_hdf5 = False
-        if self.__SAVE_RESULTS_IN_HDF5:
+        if self.__hdf5_storage_enabled():
             try:
                 HDF5Storage().save_result(experiment_id, result)
                 saved_in_hdf5 = True
@@ -120,7 +119,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         if metadata.label == "":
             raise ValueError("metadata.label cannot be empty")
         saved_in_hdf5 = False
-        if self.__SAVE_RESULTS_IN_HDF5:
+        if self.__hdf5_storage_enabled():
             try:
                 HDF5Storage().save_metadata(experiment_id, metadata)
                 saved_in_hdf5 = True
@@ -190,10 +189,11 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         label: Optional[str] = None,
         stage: Optional[int] = None,
     ) -> Iterable[ResultRecord]:
-        if not self.__SAVE_RESULTS_IN_HDF5:
-            return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
-        else:
+        if self.__hdf5_storage_enabled():
             return HDF5Storage().get_result_records(experiment_id, stage, label)
+        else:
+            return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
+
         pass
 
     def __get_results_from_sqlalchemy(
@@ -211,7 +211,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
                 query = query.filter(ResultTable.label == str(label))
             if stage is not None:
                 query = query.filter(ResultTable.stage == int(stage))
-            if self.__SAVE_RESULTS_IN_HDF5 and saved_in_hdf5 is not None:
+            if self.__hdf5_storage_enabled() and saved_in_hdf5 is not None:
                 query = query.filter(ResultTable.saved_in_hdf5 == bool(saved_in_hdf5))
             return [item.to_record() for item in query.all()]
 
@@ -459,3 +459,8 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
                 return {item.name for item in query}
             else:
                 return set()
+
+    @staticmethod
+    def __hdf5_storage_enabled() -> bool:
+        """ Feature toggle for 'hdf5 storage' feature """
+        return settings.get("toggles.hdf5_storage", True)

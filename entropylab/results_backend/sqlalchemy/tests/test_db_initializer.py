@@ -2,7 +2,9 @@ import os
 from datetime import datetime
 from shutil import copyfile
 
+from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
+from entropylab.api.data_writer import Metadata
 from entropylab.results_backend.sqlalchemy.storage import HDF_FILENAME, HDF5Storage
 from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 
@@ -49,10 +51,10 @@ def test_upgrade_db_when_db_is_in_memory():
 
 def test__migrate_results_to_hdf5(request):
     # arrange
+    settings.toggles = {"hdf5_storage": False}
     path = f"./tests_cache/{request.node.name}.db"
     try:
         db = SqlAlchemyDB(path, echo=True)
-        db.__SAVE_RESULTS_IN_HDF5 = False
         db.save_result(1, RawResultData(stage=1, label="foo", data="bar"))
         db.save_result(1, RawResultData(stage=1, label="baz", data="buz"))
         db.save_result(1, RawResultData(stage=2, label="biz", data="bez"))
@@ -76,15 +78,15 @@ def test__migrate_results_to_hdf5(request):
 
 def test__migrate_metadata_to_hdf5(request):
     # arrange
+    settings.toggles = {"hdf5_storage": False}
     path = f"./tests_cache/{request.node.name}.db"
     try:
         db = SqlAlchemyDB(path, echo=True)
-        db.__SAVE_RESULTS_IN_HDF5 = False
-        db.save_metadata(1, RawResultData(stage=1, label="foo", data="bar"))
-        db.save_metadata(1, RawResultData(stage=1, label="baz", data="buz"))
-        db.save_metadata(1, RawResultData(stage=2, label="biz", data="bez"))
-        db.save_metadata(2, RawResultData(stage=1, label="bat", data="bot"))
-        db.save_metadata(3, RawResultData(stage=1, label="ooh", data="aah"))
+        db.save_metadata(1, Metadata(stage=1, label="foo", data="bar"))
+        db.save_metadata(1, Metadata(stage=1, label="baz", data="buz"))
+        db.save_metadata(1, Metadata(stage=2, label="biz", data="bez"))
+        db.save_metadata(2, Metadata(stage=1, label="bat", data="bot"))
+        db.save_metadata(3, Metadata(stage=1, label="ooh", data="aah"))
         target = _DbInitializer(path, echo=True)
         # act
         target._migrate_metadata_to_hdf5()
