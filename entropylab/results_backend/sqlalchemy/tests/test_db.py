@@ -22,12 +22,10 @@ def test_save_result_raises_when_same_result_saved_twice(request):
             db.save_result(0, raw_result)
     finally:
         # clean up
-        _delete_if_exists("./entropy.hdf5")
+        _delete_if_exists(HDF_FILENAME)
         _delete_if_exists(path)
 
 
 def _delete_if_exists(filename: str):
     if os.path.isfile(filename):
         os.remove(filename)
-    if os.path.isfile(HDF_FILENAME):
-        os.remove(HDF_FILENAME)

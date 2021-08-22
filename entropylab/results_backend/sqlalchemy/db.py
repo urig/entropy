@@ -100,7 +100,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         saved_in_hdf5 = False
         if self.__hdf5_storage_enabled():
             try:
-                HDF5Storage().save_result(experiment_id, result)
+                self._storage.save_result(experiment_id, result)
                 saved_in_hdf5 = True
             except ValueError as ex:
                 raise ValueError(
@@ -122,7 +122,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         saved_in_hdf5 = False
         if self.__hdf5_storage_enabled():
             try:
-                HDF5Storage().save_metadata(experiment_id, metadata)
+                self._storage.save_metadata(experiment_id, metadata)
                 saved_in_hdf5 = True
             except ValueError as ex:
                 raise ValueError(
@@ -191,7 +191,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         stage: Optional[int] = None,
     ) -> Iterable[ResultRecord]:
         if self.__hdf5_storage_enabled():
-            return HDF5Storage().get_result_records(experiment_id, stage, label)
+            return self._storage.get_result_records(experiment_id, stage, label)
         else:
             return self.__get_results_from_sqlalchemy(experiment_id, label, stage)
 
