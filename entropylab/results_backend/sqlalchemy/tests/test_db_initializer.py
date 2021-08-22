@@ -11,12 +11,13 @@ from entropylab.results_backend.sqlalchemy.db_initializer import _DbInitializer
 HDF_FILENAME = "./entropy.hdf5"
 
 
-def test_upgrade_db_when_initial_db_is_empty():
+def test_upgrade_db_when_initial_db_is_empty(request):
     # arrange
     db_template = f"./db_templates/initial.db"
     db_under_test = _get_test_file_name(db_template)
     try:
-        copyfile(db_template, db_under_test)
+        _copy_db(db_template, db_under_test, request)
+
         target = _DbInitializer(db_under_test, echo=True)
         # act
         target.upgrade_db()
@@ -112,6 +113,11 @@ def _get_test_file_name(filename):
     return filename.replace("db_templates", "tests_cache").replace(
         ".db", f"_{timestamp}.db"
     )
+
+
+def _copy_db(src, dst, request):
+    """ Copy the source DB (path relative to test file) to the destination dir """
+    copyfile(os.path.join(request.fspath.dirname, src), dst)
 
 
 def _delete_if_exists(filename: str):

@@ -1,10 +1,18 @@
 import os
 from datetime import datetime
+from pathlib import Path
 from shutil import copyfile
 
 import pytest
 
 from entropylab import SqlAlchemyDB
+
+
+@pytest.fixture(scope="function")
+def change_test_dir(request):
+    os.chdir(request.fspath.dirname)
+    yield
+    os.chdir(request.config.invocation_dir)
 
 
 @pytest.mark.parametrize("path", [None, ":memory:"])
@@ -27,11 +35,13 @@ def test_ctor_creates_up_to_date_schema_when_in_memory(path: str):
         ("./db_templates/with_saved_in_hdf5_col.db", False),  # revision 04ae19b32c08
     ],
 )
-def test_ctor_ensures_latest_migration(db_template: str, expected_to_raise: bool):
+def test_ctor_ensures_latest_migration(
+    db_template: str, expected_to_raise: bool, request
+):
     # arrange
     if db_template is not None:
         db_under_test = _get_test_file_name(db_template)
-        copyfile(db_template, db_under_test)
+        _copy_db(db_template, db_under_test, request)
     else:
         db_under_test = _get_test_file_name("tests_cache/new.db")
     try:
@@ -46,15 +56,16 @@ def test_ctor_ensures_latest_migration(db_template: str, expected_to_raise: bool
         _delete_if_exists(db_under_test)
 
 
-# Add a test for db with initial schema and values in tables.
-# test revision matrix
-
-
 def _get_test_file_name(filename):
     timestamp = f"{datetime.now():%Y-%m-%d-%H-%M-%S}"
     return filename.replace("db_templates", "tests_cache").replace(
         ".db", f"_{timestamp}.db"
     )
+
+
+def _copy_db(src, dst, request):
+    """ Copy the source DB (path relative to test file) to the destination dir """
+    copyfile(os.path.join(request.fspath.dirname, src), dst)
 
 
 def _delete_if_exists(filename: str):
