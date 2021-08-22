@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Optional, Any, Iterable, TypeVar, Callable
 
 import h5py
+import numpy as np
 
 from entropylab import RawResultData
 from entropylab.api.data_reader import ResultRecord, MetadataRecord
@@ -49,7 +50,8 @@ def _data_from(dset: h5py.Dataset) -> Any:
     elif dset.attrs.get("data_type") == ResultDataType.Pickled.value:
         return pickle.loads(data)
     elif dset.attrs.get("data_type") == ResultDataType.String.value:
-        return data.decode()
+        # unpicklable data is stored as HDF5 Opaque so turn to bytes then to string:
+        return data.tobytes().decode(encoding="utf-8")
     else:
         return data
 
@@ -207,7 +209,7 @@ class HDF5Writer:
         data: Any,
         time: datetime,
         story: Optional[str] = None,
-        migrated_id: Optional[int] = None,
+        migrated_id: Optional[str] = None,
     ) -> str:
         path = f"/experiments/{experiment_id}/{stage}/{label}"
         group = file.require_group(path)
@@ -230,23 +232,20 @@ class HDF5Writer:
             dset = group.create_dataset(name=name, data=data)
         except TypeError:
             data_type, pickled = self._pickle_data(data)
-            # TODO: Why ascii? Why string_dtype? Maybe just save bytes...
-            dtype = h5py.string_dtype(encoding="ascii", length=len(pickled))
-            dset = group.create_dataset(name=name, data=pickled, dtype=dtype)
+            # np.void turns our string to bytes (HDF5 Opaque):
+            dset = group.create_dataset(name=name, data=np.void(pickled))
             dset.attrs.create("data_type", data_type.value, dtype="i2")
-        except ValueError as ex:
-            raise
         return dset
 
     @staticmethod
-    def _pickle_data(data: Any):
+    def _pickle_data(data: Any) -> (bytes, ResultDataType):
         # noinspection PyBroadException
         try:
             pickled = pickle.dumps(data)
             data_type = ResultDataType.Pickled
         except Exception as ex:
             logger.debug("Could not pickle data, defaulting to __repr__()", ex)
-            pickled = data.__repr__().encode(encoding="UTF-8")
+            pickled = data.__repr__().encode(encoding="utf-8")
             data_type = ResultDataType.String
         return data_type, pickled
 
