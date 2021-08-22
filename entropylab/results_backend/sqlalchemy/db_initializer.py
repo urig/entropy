@@ -41,7 +41,6 @@ class _DbInitializer:
                 )
         return self._engine
 
-    # TODO: Hide behind module/db.py level function
     def upgrade_db(self) -> None:
         self._alembic_upgrade()
         self._migrate_results_to_hdf5()
