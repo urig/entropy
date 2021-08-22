@@ -61,8 +61,7 @@ def _time_from(dset: h5py.Dataset) -> datetime:
 def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
     return ResultRecord(
         experiment_id=_experiment_from(dset),
-        # TODO: Get confirmation to change id to string
-        id=0,  # id_from(dset),
+        id=_id_from(dset),
         label=_label_from(dset),
         story=_story_from(dset),
         stage=_stage_from(dset),
@@ -74,8 +73,7 @@ def _build_result_record(dset: h5py.Dataset) -> ResultRecord:
 def _build_metadata_record(dset: h5py.Dataset) -> MetadataRecord:
     return MetadataRecord(
         experiment_id=_experiment_from(dset),
-        # TODO: Get confirmation to change id to string
-        id=0,  # id_from(dset),
+        id=_id_from(dset),
         label=_label_from(dset),
         stage=_stage_from(dset),
         data=_data_from(dset),
