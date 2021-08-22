@@ -135,7 +135,6 @@ class HDF5Reader:
                             dsets.append(convert_from_dset(dset))
             return dsets
         except FileNotFoundError:
-            # TODO: Log input args:
             logger.exception("FileNotFoundError in get_experiment_entities()")
             return dsets
 

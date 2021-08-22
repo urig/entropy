@@ -53,7 +53,8 @@ class UnPicklable(object):
         ResultDataType.String,
         Picklable("bar"),
         UnPicklable("bar"),
-        # TODO: Add test case for fixed length string
+        # fixed length unicode string:
+        np.array("2.0±0.1".encode("utf-8"), dtype=h5py.string_dtype("utf-8", 30)),
     ],
 )
 def test_write_and_read_single_result(data: Any):
@@ -75,7 +76,7 @@ def test_write_and_read_single_result(data: Any):
         if isinstance(data, list) or isinstance(data, tuple):
             _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, np.ndarray):
-            _assert_lists_are_equal(actual.data, data)
+            assert (actual.data == data).all()
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
                 "<entropylab.results_backend.sqlalchemy.tests.test_storage.UnPicklable"
@@ -106,7 +107,8 @@ def test_write_and_read_single_result(data: Any):
         ResultDataType.String,
         Picklable("bar"),
         UnPicklable("bar"),
-        # TODO: Add test case for fixed length string
+        # fixed length unicode string:
+        np.array("2.0±0.1".encode("utf-8"), dtype=h5py.string_dtype("utf-8", 30)),
     ],
 )
 def test_write_and_read_single_metadata(data: Any):
@@ -127,7 +129,7 @@ def test_write_and_read_single_metadata(data: Any):
         if isinstance(data, list) or isinstance(data, tuple):
             _assert_lists_are_equal(actual.data, data)
         elif isinstance(data, np.ndarray):
-            _assert_lists_are_equal(actual.data, data)
+            assert (actual.data == data).all()
         elif isinstance(data, UnPicklable):
             assert str(actual.data).startswith(
                 "<entropylab.results_backend.sqlalchemy.tests.test_storage.UnPicklable"
