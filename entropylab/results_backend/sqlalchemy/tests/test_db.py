@@ -6,6 +6,9 @@ from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
 
 
+HDF_FILENAME = "./entropy.hdf5"
+
+
 def test_save_result_raises_when_same_result_saved_twice(request):
     # arrange
     settings.toggles = {"hdf5_storage": True}  # this feature is new in HDF5Storage
@@ -26,3 +29,5 @@ def test_save_result_raises_when_same_result_saved_twice(request):
 def _delete_if_exists(filename: str):
     if os.path.isfile(filename):
         os.remove(filename)
+    if os.path.isfile(HDF_FILENAME):
+        os.remove(HDF_FILENAME)
