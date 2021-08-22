@@ -91,7 +91,7 @@ class _DbInitializer:
         """
         Modified by @urig to share a single engine across multiple (typically in-memory)
         connections, based on this cookbook recipe:
-        https://alembic.sqlalchemy.org/en/latest/cookbook.html#connection-sharing 
+        https://alembic.sqlalchemy.org/en/latest/cookbook.html#connection-sharing
         """
         alembic_cfg.set_main_option("sqlalchemy.url", "sqlite:///:memory:")
         alembic_cfg.attributes["connection"] = connection  # overrides dummy url above

@@ -264,7 +264,8 @@ class HDF5Migrator(HDF5Writer):
                         record = row.to_record()
                         hdf5_id = self._migrate_record(file, entity_type, record)
                         logger.debug(
-                            f"Migrated ${entity_type.name} with id [{row.id}] to HDF5 with id [{hdf5_id}]"
+                            f"Migrated ${entity_type.name} with id [{row.id}] "
+                            f"to HDF5 with id [{hdf5_id}]"
                         )
 
     def _migrate_record(
