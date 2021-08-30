@@ -21,7 +21,7 @@ colors = itertools.cycle(palette)
 class Dashboard(param.Parameterized):
     def __init__(self, **params):
         super().__init__(**params)
-        self._selected_plots = set()
+        # self._selected_plots = set()
         # self.data_reader = MockDashboardDataReader()
         connector = SqlAlchemyDB("my_db.db", False)
         self.dashboard_data_reader = SqlalchemyDashboardDataReader(connector)
@@ -57,6 +57,7 @@ class Dashboard(param.Parameterized):
             tools="pan,lasso_select,box_select,crosshair,xwheel_zoom,ywheel_zoom,zoom_in,reset,save,hover",
         )
         self.add_plot_figure.line()
+        # self.add_plot_figure.legend.click_policy = "hide"
         self.export_to_csv = pn.widgets.FileDownload(
             label="export to csv",
             on_click=self.export_to_csv_callback,
@@ -70,26 +71,14 @@ class Dashboard(param.Parameterized):
         self.add_plot_figure.line()
 
     def add_plot_to_combined_callback(self, *events):
-
-        plot: PlotRecord = self.plot_tabs_records[self.plot_tabs.active]
-        self._selected_plots.add(plot.experiment_id)
+        plot: PlotRecord = self.plot_tabs_records[self.plot_tabs.active - 1]
+        # self._selected_plots.add(plot)
         plot.generator.plot_bokeh(
             self.add_plot_figure,
             plot.plot_data,
             color=next(colors),
             label=f"{plot.experiment_id}",
         )
-        self.add_plot_figure.legend.click_policy = "hide"
-
-    def toggle_plug_in_combined(self, plot: PlotRecord):
-        self._selected_plots.add(plot.experiment_id)
-        plot.generator.plot_bokeh(
-            self.add_plot_figure,
-            plot.plot_data,
-            color=next(colors),
-            label=f"{plot.experiment_id}",
-        )
-        self.add_plot_figure.legend.click_policy = "hide"
 
     def export_to_csv_callback(self, *events):
         sio = StringIO()
@@ -148,7 +137,6 @@ class Dashboard(param.Parameterized):
                         label=f"{plot.experiment_id}",
                     )
                     self.plot_tabs_records.append(plot)
-                    print("guy")
                     self.plot_tabs.append(figure)
                 else:
                     pass  # TODO do our best
