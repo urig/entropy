@@ -19,11 +19,11 @@ colors = itertools.cycle(palette)
 
 
 class Dashboard(param.Parameterized):
-    def __init__(self, **params):
+    def __init__(self, path="my_db.db", **params):
         super().__init__(**params)
         # self._selected_plots = set()
         # self.data_reader = MockDashboardDataReader()
-        connector = SqlAlchemyDB("my_db.db", False)
+        connector = SqlAlchemyDB(path)
         self.dashboard_data_reader = SqlalchemyDashboardDataReader(connector)
 
         self.res_num = pn.widgets.Select(

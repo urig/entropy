@@ -12,4 +12,8 @@ pn.extension()
 
 dashboard = Dashboard()
 dashboard.servable()
-# pn.serve(dashboard.servable())
+
+
+def main():
+    print("Hello World!")
+    pn.serve(dashboard.servable())
