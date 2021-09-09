@@ -13,6 +13,8 @@ pn.extension()
 dashboard = Dashboard()
 dashboard.servable()
 
+# TODO : Remove this file (replaced by CLI/main.py)
+
 
 def main():
     print("Hello World!")

@@ -1,49 +1,56 @@
 import argparse
-import os
 
 from entropylab.results import serve_results
-from entropylab.results_backend.sqlalchemy import upgrade_db
+from entropylab.results_backend.sqlalchemy import init_db, upgrade_db
 
 
-def results_function(args: argparse.Namespace):
-    serve_results(args.path)
+def init(args: argparse.Namespace):
+    init_db(args.directory)
+    pass
 
 
-def database_function(args: argparse.Namespace):
-    upgrade_db(args.path)
+def serve(args: argparse.Namespace):
+    serve_results(args.directory)
+
+
+def update(args: argparse.Namespace):
+    upgrade_db(args.directory)
 
 
 def build_parser():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    # results
-    results_parser = subparsers.add_parser(
-        "results", help="view and chart experiment results"
-    )
-    results_parser.add_argument(
-        "action",
-        choices=["serve"],
-        help="start entropy results viewer in a new browser window",
-    )
-    results_parser.add_argument("path", help="path to database")
-    results_parser.set_defaults(func=results_function)
+    directory_arg = {
+        "help": "path to a directory containing Entropy project",
+        "nargs": "?",
+        "default": ".",
+    }
 
-    # database
-    database_parser = subparsers.add_parser("database", help="database maintenance")
-    database_parser.add_argument(
-        "action",
-        choices=["update"],
-        help="maintenance action to perform on the database",
+    # init
+    init_parser = subparsers.add_parser("init", help="initialize a new Entropy project")
+    init_parser.add_argument("directory", **directory_arg)
+    init_parser.set_defaults(func=init)
+
+    # update
+    update_parser = subparsers.add_parser(
+        "update", help="update an Entropy project to the latest version"
     )
-    database_parser.add_argument("path", help="path to database")
-    database_parser.set_defaults(func=database_function)
+    update_parser.add_argument("directory", **directory_arg)
+    update_parser.set_defaults(func=update)
+
+    # serve
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="launch results server in a new browser window",
+    )
+    serve_parser.add_argument("directory", **directory_arg)
+    serve_parser.set_defaults(func=serve)
 
     return parser
 
 
 def main():
-    print("CWD: " + os.getcwd())
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
