@@ -7,6 +7,7 @@ from bokeh.models import Renderer
 from bokeh.plotting import Figure
 from matplotlib.figure import Figure as matplotlibFigure
 
+
 # TODO check where we save the snapshot(in the end)
 @dataclass
 class ExperimentInitialData:

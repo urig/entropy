@@ -39,12 +39,10 @@ class Dashboard(param.Parameterized):
         self.dashboard_title = "# Entropy Dataviewer 0.0.1"
         self.dashboard_desc = "A viewer for the most recent experiments on the database"
 
-        table_watcher = self.df_widget.param.watch(
+        self.df_widget.param.watch(
             self.table_callback, ["selection"], onlychanged=False
         )
-        res_num_watcher = self.res_num.param.watch(
-            self.res_num_callback, ["value"], onlychanged=False
-        )
+        self.res_num.param.watch(self.res_num_callback, ["value"], onlychanged=False)
         self.plot_tabs = pn.Tabs(Figure(name=""))
         self.plot_tabs_records = []
         self.add_plot_to_combined = pn.widgets.Button(name="add plot")
@@ -54,7 +52,8 @@ class Dashboard(param.Parameterized):
         self.clear_plots.on_click(self.clear_button_callback)
         self.add_plot_figure = Figure(
             name="",
-            tools="pan,lasso_select,box_select,crosshair,xwheel_zoom,ywheel_zoom,zoom_in,reset,save,hover",
+            tools="pan,lasso_select,box_select,crosshair,xwheel_zoom,ywheel_zoom,"
+            "zoom_in,reset,save,hover",
         )
         self.add_plot_figure.line()
         # self.add_plot_figure.legend.click_policy = "hide"
@@ -125,7 +124,8 @@ class Dashboard(param.Parameterized):
                 generator = plot.generator
                 if generator:
                     # label_opts = dict(
-                    #     x = 0, y = 0,                     x_units = 'screen', y_units = 'screen'
+                    #     x = 0, y = 0,
+                    #     x_units = 'screen', y_units = 'screen'
                     # )
                     # caption2 = Label(text=plot.story, **label_opts)
                     figure = Figure(name=plot.label, title=plot.story)
