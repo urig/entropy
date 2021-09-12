@@ -43,19 +43,19 @@ def test_safe_run_command_that_raises():
 
 @command
 def no_args_func() -> None:
-    print("Yay!")
+    print("Foo!")
 
 
 @command
 def one_args_func(one: str) -> None:
-    print("Yay! " + one)
+    print("Foo! " + one)
 
 
 @command
 def two_args_func(one: str, two: str) -> None:
-    print("Yay! " + one + " " + two)
+    print("Foo! " + one + " " + two)
 
 
 @command
 def two_args_func_that_raises():
-    raise RuntimeError("Yay!")
+    raise RuntimeError("Foo!")

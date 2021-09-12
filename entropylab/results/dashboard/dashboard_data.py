@@ -67,7 +67,7 @@ class SqlalchemyDashboardDataReader(DashboardDataReader):
                         id=-1,
                         label=f"Automatic {result.label}",
                         story=result.story,
-                        plot_data=data
+                        plot_data=data,
                     )
                 )
         return plots
