@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from entropylab.logger import logger
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable, MetadataTable
+from entropylab.results_backend.sqlalchemy.project import project_name, project_path
 from entropylab.results_backend.sqlalchemy.storage import HDF5Storage, EntityType
 
 _SQL_ALCHEMY_MEMORY = ":memory:"
@@ -29,7 +30,7 @@ class _DbInitializer:
         :param echo: if True, the database engine will log all statements
         """
         if path is not None and Path(path).suffix == ".db":
-            logger.debug(
+            logger.error(
                 f"_DbInitializer provided with path to a sqlite database. This is deprecated."
             )
             raise RuntimeError(
@@ -39,6 +40,14 @@ class _DbInitializer:
                 "entropylab.results_backend.sqlalchemy.upgrade_db() function. * Before upgrading be sure "
                 "to back up your database to a safe place *."
             )
+        if path is not None and os.path.isfile(path):
+            logger.error(
+                f"_DbInitializer provided with path to a file, not a directory."
+            )
+            raise RuntimeError(
+                f"SqlAlchemyDB() constructor provided with a path to a file but "
+                f"expects the path to an Entropy project folder"
+            )
         in_memory_mode = path is None or path == _SQL_ALCHEMY_MEMORY
         if in_memory_mode:
             logger.debug(f"_DbInitializer is in in-memory mode")
@@ -46,7 +55,7 @@ class _DbInitializer:
             self._engine = create_engine("sqlite:///" + _SQL_ALCHEMY_MEMORY, echo=echo)
         else:
             logger.debug(f"_DbInitializer is in project directory mode")
-
+            creating_new = os.path.isdir(path)
             entropy_dir_path = os.path.join(path, _ENTROPY_DIRNAME)
             os.makedirs(entropy_dir_path, exist_ok=True)
             logger.debug(f"Entropy directory is at: {entropy_dir_path}")
@@ -59,6 +68,14 @@ class _DbInitializer:
 
             self._engine = create_engine("sqlite:///" + db_file_path, echo=echo)
             self._storage = HDF5Storage(hdf5_file_path)
+            if creating_new:
+                self.print_project_created(path)
+
+    @staticmethod
+    def print_project_created(path):
+        print(
+            f"New Entropy project '{project_name(path)}' created at '{project_path(path)}'"
+        )
 
     def init_db(self) -> tuple[sqlalchemy.engine.Engine, HDF5Storage]:
         if self._db_is_empty():
