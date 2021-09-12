@@ -1,4 +1,5 @@
 import argparse
+import functools
 import sys
 import traceback
 
@@ -7,32 +8,43 @@ from entropylab.results import serve_results
 from entropylab.results_backend.sqlalchemy import init_db, upgrade_db
 
 
+# decorator
+
+
+def command(func: callable) -> callable:
+    """Decorator that runs commands. On error, prints friendly message when possible """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except RuntimeError as re:
+            command_name = func.__name__
+            logger.exception(
+                f"RuntimeError in Entropy CLI command %s, args: %s", command_name, args
+            )
+            print(re, file=sys.stderr)
+            sys.exit(-1)
+
+    return wrapper
+
+
 # CLI command functions
 
 
+@command
 def init(args: argparse.Namespace):
-    _safe_run_command(init_db, args.directory)
+    init_db(args.directory)
 
 
-def serve(args: argparse.Namespace):
-    _safe_run_command(serve_results, args.directory, port=args.port)
-
-
+@command
 def update(args: argparse.Namespace):
-    _safe_run_command(upgrade_db, args.directory)
+    upgrade_db(args.directory)
 
 
-# noinspection PyBroadException
-def _safe_run_command(command_func: callable, *args, **kwargs) -> None:
-    try:
-        command_func(*args, **kwargs)
-    except Exception:
-        command_name = command_func.__name__
-        logger.exception(
-            f"Entropy CLI command %s raised an error. args: %s", command_name, args
-        )
-        traceback.print_exc()
-        sys.exit(-1)
+@command
+def serve(args: argparse.Namespace):
+    serve_results(args.directory, port=args.port)
 
 
 def _build_parser():
