@@ -1,7 +1,14 @@
+import argparse
+
 import pytest
 
+from entropylab.cli.main import init, command
 
-from entropylab.cli.main import _safe_run_command
+
+def test_init():
+    args = argparse.Namespace
+    args.directory = "."
+    init(args)
 
 
 # def test_serve():
@@ -15,43 +22,40 @@ from entropylab.cli.main import _safe_run_command
 #     mock_function.assert_called_once()
 
 
-# _safe_run_command()
 def test_safe_run_command_with_no_args():
-    _safe_run_command(no_args_func)
+    no_args_func()
 
 
 def test_safe_run_command_with_one_args():
-    _safe_run_command(one_args_func, "yo!")
+    one_args_func("foo")
 
 
 def test_safe_run_command_with_two_args():
-    _safe_run_command(two_args_func, "yo!", "dog")
+    two_args_func("foo", "bar")
 
 
 def test_safe_run_command_that_raises():
     with pytest.raises(SystemExit) as se:
-        _safe_run_command(two_args_func_that_raises)
-        # safe_run_command(no_args_func, "yo!", "dog")
+        two_args_func_that_raises()
     assert se.type == SystemExit
     assert se.value.code == -1
 
 
+@command
 def no_args_func() -> None:
     print("Yay!")
 
 
+@command
 def one_args_func(one: str) -> None:
     print("Yay! " + one)
 
 
+@command
 def two_args_func(one: str, two: str) -> None:
     print("Yay! " + one + " " + two)
 
 
+@command
 def two_args_func_that_raises():
     raise RuntimeError("Yay!")
-
-
-def func_under_test(message: str, bar: str):
-    raise RuntimeError
-    print(message)
