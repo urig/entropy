@@ -1,23 +1,41 @@
 import argparse
+import sys
+import traceback
 
+from entropylab.logger import logger
 from entropylab.results import serve_results
 from entropylab.results_backend.sqlalchemy import init_db, upgrade_db
 
 
+# CLI command functions
+
+
 def init(args: argparse.Namespace):
-    init_db(args.directory)
-    pass
+    _safe_run_command(init_db, args.directory)
 
 
 def serve(args: argparse.Namespace):
-    serve_results(args.directory, port=args.port)
+    _safe_run_command(serve_results, args.directory, port=args.port)
 
 
 def update(args: argparse.Namespace):
-    upgrade_db(args.directory)
+    _safe_run_command(upgrade_db, args.directory)
 
 
-def build_parser():
+# noinspection PyBroadException
+def _safe_run_command(command_func: callable, *args, **kwargs) -> None:
+    try:
+        command_func(*args, **kwargs)
+    except Exception:
+        command_name = command_func.__name__
+        logger.exception(
+            f"Entropy CLI command %s raised an error. args: %s", command_name, args
+        )
+        traceback.print_exc()
+        sys.exit(-1)
+
+
+def _build_parser():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
@@ -51,8 +69,11 @@ def build_parser():
     return parser
 
 
+# main
+
+
 def main():
-    parser = build_parser()
+    parser = _build_parser()
     args = parser.parse_args()
     args.func(args)
 
