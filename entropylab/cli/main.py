@@ -1,7 +1,6 @@
 import argparse
 import functools
 import sys
-import traceback
 
 from entropylab.logger import logger
 from entropylab.results import serve_results
@@ -21,7 +20,7 @@ def command(func: callable) -> callable:
         except RuntimeError as re:
             command_name = func.__name__
             logger.exception(
-                f"RuntimeError in Entropy CLI command %s, args: %s", command_name, args
+                "RuntimeError in Entropy CLI command %s, args: %s", command_name, args
             )
             print(re, file=sys.stderr)
             sys.exit(-1)
