@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import TypeVar, Type
+from typing import TypeVar, Type, Tuple
 
 from alembic import script, command
 from alembic.config import Config
@@ -50,8 +50,7 @@ class _DbInitializer:
                 "SqlAlchemyDB() constructor provided with a path to a file but "
                 "expects the path to an Entropy project folder"
             )
-        in_memory_mode = path is None or path == _SQL_ALCHEMY_MEMORY
-        if in_memory_mode:
+        if path is None or path == _SQL_ALCHEMY_MEMORY:
             logger.debug("_DbInitializer is in in-memory mode")
             self._storage = HDF5Storage()
             self._engine = create_engine("sqlite:///" + _SQL_ALCHEMY_MEMORY, echo=echo)
@@ -79,7 +78,7 @@ class _DbInitializer:
             f"New Entropy project '{project_name(path)}' created at '{project_path(path)}'"
         )
 
-    def init_db(self) -> tuple[sqlalchemy.engine.Engine, HDF5Storage]:
+    def init_db(self) -> Tuple[sqlalchemy.engine.Engine, HDF5Storage]:
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
             self._alembic_stamp_head()
