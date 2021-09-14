@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime
 
 import pytest
@@ -8,6 +9,9 @@ from entropylab.api.execution import EntropyContext
 from entropylab.api.plot import CirclePlotGenerator, LinePlotGenerator
 from entropylab.instruments.lab_topology import LabResources, ExperimentResources
 from entropylab.results_backend.sqlalchemy.db import SqlAlchemyDB
+from entropylab.results_backend.sqlalchemy.tests.test_utils import (
+    build_project_dir_path_for_test,
+)
 from entropylab.script_experiment import Script, script_experiment
 from entropylab.tests.mock_instruments import MockScope
 
@@ -30,10 +34,10 @@ def an_experiment(context: EntropyContext):
     a1 = do_something()
     scope.get_trig()
     for i in range(30):
-        context.add_result("a_result", a1 + i + datetime.now().microsecond)
+        context.add_result("a_result" + str(i), a1 + i + datetime.now().microsecond)
 
         b1 = do_something2()
-        context.add_result("b_result", b1 + i + datetime.now().microsecond)
+        context.add_result("b_result" + str(i), b1 + i + datetime.now().microsecond)
 
     micro = datetime.now().microsecond
     context.add_result(
@@ -59,10 +63,10 @@ def an_experiment_with_plot(experiment: EntropyContext):
     a1 = do_something()
     scope.get_trig()
     for i in range(30):
-        experiment.add_result("a_result", a1 + i + datetime.now().microsecond)
+        experiment.add_result("a_result" + str(i), a1 + i + datetime.now().microsecond)
 
         b1 = do_something2()
-        experiment.add_result("b_result", b1 + i + datetime.now().microsecond)
+        experiment.add_result("b_result" + str(i), b1 + i + datetime.now().microsecond)
 
     micro = datetime.now().microsecond
     experiment.add_plot(
@@ -115,11 +119,12 @@ def test_running_no_db():
 
 
 @pytest.mark.repeat(3)
-def test_running_db():
+def test_running_db(request):
+    project_dir = build_project_dir_path_for_test(request)
     try:
         resources = ExperimentResources()
         resources.add_temp_resource("scope_1", MockScope("1.1.1.1", ""))
-        db = SqlAlchemyDB("my_db.db")
+        db = SqlAlchemyDB(project_dir)
 
         definition = Script(resources, an_experiment, "with_db")
 
@@ -128,17 +133,18 @@ def test_running_db():
         print(reader.get_experiment_info())
         print(reader.get_experiment_info().script.print_all())
 
-        db = SqlAlchemyDB("my_db.db")
+        db = SqlAlchemyDB(project_dir)
         definition = Script(resources, an_experiment_with_plot, "with_db")
         definition.run(db)
     finally:
-        os.remove("my_db.db")
+        shutil.rmtree(project_dir)
 
 
-def test_running_db_and_topology():
+def test_running_db_and_topology(request):
+    project_dir = build_project_dir_path_for_test(request)
     try:
         # setup lab environment one time
-        db = SqlAlchemyDB("db_and_topo.db")
+        db = SqlAlchemyDB(project_dir)
         lab = LabResources(db)
         lab.register_resource(
             "scope_1",
@@ -202,14 +208,14 @@ def test_running_db_and_topology():
         print(reader.get_experiment_info().script.print_all())
 
     finally:
-        os.remove("db_and_topo.db")
-        pass
+        shutil.rmtree(project_dir)
 
 
-def test_running_db_and_topology_with_kwargs():
+def test_running_db_and_topology_with_kwargs(request):
+    project_dir = build_project_dir_path_for_test(request)
     try:
         # setup lab environment one time
-        db = SqlAlchemyDB("db_and_topo.db")
+        db = SqlAlchemyDB(project_dir)
         lab = LabResources(db)
         lab.register_resource(
             "scope_1",
@@ -244,8 +250,7 @@ def test_running_db_and_topology_with_kwargs():
         print(reader.get_experiment_info())
         print(reader.get_experiment_info().script.print_all())
     finally:
-        os.remove("db_and_topo.db")
-        pass
+        shutil.rmtree(project_dir)
 
 
 def test_executor_decorator():

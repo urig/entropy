@@ -1,10 +1,14 @@
 import os
+import shutil
 from datetime import datetime
 
 from entropylab import Script
 from entropylab.api.execution import EntropyContext
 from entropylab.instruments.lab_topology import LabResources, ExperimentResources
 from entropylab.results_backend.sqlalchemy.db import SqlAlchemyDB
+from entropylab.results_backend.sqlalchemy.tests.test_utils import (
+    build_project_dir_path_for_test,
+)
 from entropylab.tests.mock_instruments import MockScope
 
 repeats = 30
@@ -14,9 +18,9 @@ def an_experiment(experiment: EntropyContext):
     scope = experiment.get_resource("scope_1")
     scope.get_trig()
     for i in range(repeats):
-        experiment.add_result("a_result", 5 + i + datetime.now().microsecond)
+        experiment.add_result("a_result" + str(i), 5 + i + datetime.now().microsecond)
 
-        experiment.add_result("b_result", 6 + i + datetime.now().microsecond)
+        experiment.add_result("b_result" + str(i), 6 + i + datetime.now().microsecond)
 
     micro = datetime.now().microsecond
     experiment.add_result(
@@ -37,9 +41,10 @@ def an_experiment(experiment: EntropyContext):
     )
 
 
-def test_running_db_and_topology():
+def test_running_db_and_topology(request):
+    project_dir = build_project_dir_path_for_test(request)
     try:
-        db = SqlAlchemyDB("test_running_db_and_topo.db")
+        db = SqlAlchemyDB(project_dir)
         topology = LabResources(db)
         topology.register_resource_if_not_exist(
             "scope_1", MockScope, args=["1.1.1.1", ""]
@@ -59,8 +64,9 @@ def test_running_db_and_topology():
         print(reader.get_experiment_info().script.print_all())
         total_results_in_experiments = repeats * 2 + 1
         assert len(list(reader.get_results())) == total_results_in_experiments
-        assert len(list(reader.get_results("a_result"))) == repeats * 1
-        assert len(list(db.get_results(label="a_result"))) == repeats * 2
+        for i in range(repeats):
+            assert len(list(reader.get_results("a_result" + str(i)))) == 1
+            assert len(list(db.get_results(label="a_result" + str(i)))) == 2
 
         all_experiments = db.get_experiments()
         with_db_experiments = db.get_experiments(label="with_db")
@@ -73,5 +79,4 @@ def test_running_db_and_topology():
         custom_result = db.custom_query("select * from Results")
         assert len(custom_result) == total_results_in_experiments * 2
     finally:
-        os.remove("test_running_db_and_topo.db")
-        pass
+        shutil.rmtree(project_dir)
