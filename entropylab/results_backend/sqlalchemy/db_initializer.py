@@ -54,6 +54,7 @@ class _DbInitializer:
             logger.debug("_DbInitializer is in in-memory mode")
             self._storage = HDF5Storage()
             self._engine = create_engine("sqlite:///" + _SQL_ALCHEMY_MEMORY, echo=echo)
+            self._alembic_util = _AlembicUtil(self._engine)
         else:
             logger.debug("_DbInitializer is in project directory mode")
             creating_new = os.path.isdir(path)
@@ -69,6 +70,7 @@ class _DbInitializer:
 
             self._engine = create_engine("sqlite:///" + db_file_path, echo=echo)
             self._storage = HDF5Storage(hdf5_file_path)
+            self._alembic_util = _AlembicUtil(self._engine)
             if creating_new:
                 self.print_project_created(path)
 
@@ -81,9 +83,9 @@ class _DbInitializer:
     def init_db(self) -> Tuple[sqlalchemy.engine.Engine, HDF5Storage]:
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
-            self._alembic_stamp_head()
+            self._alembic_util.stamp_head()
         else:
-            if not self._db_is_up_to_date():
+            if not self._alembic_util.db_is_up_to_date():
                 path = str(self._engine.url)
                 raise RuntimeError(
                     f"The database at {path} is not up-to-date. Update the database "
@@ -92,16 +94,9 @@ class _DbInitializer:
                 )
         return self._engine, self._storage
 
-    def upgrade_db(self) -> None:
-        self._alembic_upgrade()
-        self._migrate_results_to_hdf5()
-        self._migrate_metadata_to_hdf5()
-
-    @staticmethod
-    def _create_parent_dirs(path) -> None:
-        dirname = os.path.dirname(path)
-        if dirname and dirname != "" and dirname != ".":
-            os.makedirs(dirname, exist_ok=True)
+    def upgrade_db(self):
+        upgrader = _DbUpgrader(self._engine, self._storage)
+        upgrader.upgrade_db()
 
     def _db_is_empty(self) -> bool:
         cursor = self._engine.execute(
@@ -109,44 +104,21 @@ class _DbInitializer:
         )
         return len(cursor.fetchall()) == 0
 
-    def _db_is_up_to_date(self) -> bool:
-        script_location = self._abs_path_to("alembic")
-        script_ = script.ScriptDirectory(script_location)
-        with self._engine.begin() as conn:
-            context = migration.MigrationContext.configure(conn)
-            db_version = context.get_current_revision()
-            latest_version = script_.get_current_head()
-            return db_version == latest_version
 
-    @staticmethod
-    def _abs_path_to(rel_path: str) -> str:
-        source_path = Path(__file__).resolve()
-        source_dir = source_path.parent
-        return os.path.join(source_dir, rel_path)
+class _DbUpgrader:
+    def __init__(self, engine: sqlalchemy.engine.Engine, storage: HDF5Storage):
+        self._engine = engine
+        self._storage = storage
+        self._alembic_util = _AlembicUtil(self._engine)
 
-    def _alembic_upgrade(self) -> None:
-        with self._engine.connect() as connection:
-            alembic_cfg = self._alembic_build_config(connection)
-            command.upgrade(alembic_cfg, "head")
+    def upgrade_db(self) -> None:  # TODO: path as argument
+        self._convert_to_project()
+        self._alembic_util.upgrade()
+        self._migrate_results_to_hdf5()
+        self._migrate_metadata_to_hdf5()
 
-    def _alembic_stamp_head(self) -> None:
-        with self._engine.connect() as connection:
-            alembic_cfg = self._alembic_build_config(connection)
-            command.stamp(alembic_cfg, "head")
-
-    def _alembic_build_config(self, connection: sqlalchemy.engine.Connection) -> Config:
-        config_location = self._abs_path_to("alembic.ini")
-        script_location = self._abs_path_to("alembic")
-        alembic_cfg = Config(config_location)
-        alembic_cfg.set_main_option("script_location", script_location)
-        """
-        Modified by @urig to share a single engine across multiple (typically in-memory)
-        connections, based on this cookbook recipe:
-        https://alembic.sqlalchemy.org/en/latest/cookbook.html#connection-sharing
-        """
-        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite:///:memory:")
-        alembic_cfg.attributes["connection"] = connection  # overrides dummy url above
-        return alembic_cfg
+    def _convert_to_project(self):
+        pass  # TODO: !!!
 
     def _migrate_results_to_hdf5(self) -> None:
         self._migrate_rows_to_hdf5(EntityType.RESULT, ResultTable)
@@ -171,3 +143,47 @@ class _DbInitializer:
                 logger.debug(
                     f"Marked all {entity_type.name} rows in sqlite as `saved_in_hdf5`. Done"
                 )
+
+
+class _AlembicUtil:
+    def __init__(self, engine: sqlalchemy.engine.Engine):
+        self._engine = engine
+
+    @staticmethod
+    def _abs_path_to(rel_path: str) -> str:
+        source_path = Path(__file__).resolve()
+        source_dir = source_path.parent
+        return os.path.join(source_dir, rel_path)
+
+    def upgrade(self) -> None:
+        with self._engine.connect() as connection:
+            alembic_cfg = self._alembic_build_config(connection)
+            command.upgrade(alembic_cfg, "head")
+
+    def stamp_head(self) -> None:
+        with self._engine.connect() as connection:
+            alembic_cfg = self._alembic_build_config(connection)
+            command.stamp(alembic_cfg, "head")
+
+    def db_is_up_to_date(self) -> bool:
+        script_location = self._abs_path_to("alembic")
+        script_ = script.ScriptDirectory(script_location)
+        with self._engine.begin() as conn:
+            context = migration.MigrationContext.configure(conn)
+            db_version = context.get_current_revision()
+            latest_version = script_.get_current_head()
+            return db_version == latest_version
+
+    def _alembic_build_config(self, connection: sqlalchemy.engine.Connection) -> Config:
+        config_location = self._abs_path_to("alembic.ini")
+        script_location = self._abs_path_to("alembic")
+        alembic_cfg = Config(config_location)
+        alembic_cfg.set_main_option("script_location", script_location)
+        """
+        Modified by @urig to share a single engine across multiple (typically in-memory)
+        connections, based on this cookbook recipe:
+        https://alembic.sqlalchemy.org/en/latest/cookbook.html#connection-sharing
+        """
+        alembic_cfg.set_main_option("sqlalchemy.url", "sqlite:///:memory:")
+        alembic_cfg.attributes["connection"] = connection  # overrides dummy url above
+        return alembic_cfg

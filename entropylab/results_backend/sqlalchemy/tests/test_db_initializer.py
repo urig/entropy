@@ -56,7 +56,8 @@ def test__migrate_results_to_hdf5(request):
     settings.toggles = {"hdf5_storage": False}
     test_project_dir = create_test_project(request)
     try:
-        db = SqlAlchemyDB(test_project_dir, echo=True)
+        # save to DB but not to storage:
+        db = SqlAlchemyDB(test_project_dir, echo=True, enable_hdf5_storage=False)
         db.save_result(1, RawResultData(stage=1, label="foo", data="bar"))
         db.save_result(1, RawResultData(stage=1, label="baz", data="buz"))
         db.save_result(1, RawResultData(stage=2, label="biz", data="bez"))
@@ -81,10 +82,10 @@ def test__migrate_results_to_hdf5(request):
 
 def test__migrate_metadata_to_hdf5(request):
     # arrange
-    settings.toggles = {"hdf5_storage": False}
     test_project_dir = create_test_project(request)
     try:
-        db = SqlAlchemyDB(test_project_dir, echo=True)
+        # save to DB but not to storage:
+        db = SqlAlchemyDB(test_project_dir, echo=True, enable_hdf5_storage=False)
         db.save_metadata(1, Metadata(stage=1, label="foo", data="bar"))
         db.save_metadata(1, Metadata(stage=1, label="baz", data="buz"))
         db.save_metadata(1, Metadata(stage=2, label="biz", data="bez"))
