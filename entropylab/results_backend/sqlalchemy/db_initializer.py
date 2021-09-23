@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 from typing import TypeVar, Type, Tuple
 
@@ -9,6 +10,7 @@ from sqlalchemy import create_engine
 import sqlalchemy.engine
 from sqlalchemy.orm import sessionmaker
 
+from entropylab.api.errors import EntropyError
 from entropylab.logger import logger
 from entropylab.results_backend.sqlalchemy.model import Base, ResultTable, MetadataTable
 from entropylab.results_backend.sqlalchemy.project import project_name, project_path
@@ -23,20 +25,13 @@ _HDF5_FILENAME = "entropy.hdf5"
 
 
 class _DbInitializer:
-    @staticmethod
-    def print_project_created(path):
-        print(
-            f"New Entropy project '{project_name(path)}' created at '{project_path(path)}'"
-        )
-
-    def init_db(
-        self, path: str, echo=False
-    ) -> Tuple[sqlalchemy.engine.Engine, HDF5Storage]:
+    def __init__(self, path: str, echo=False):
         """
         :param path: path to directory containing Entropy project
         :param echo: if True, the database engine will log all statements
         """
         self._validate_path(path)
+
         if path is None or path == _SQL_ALCHEMY_MEMORY:
             logger.debug("_DbInitializer is in in-memory mode")
             self._storage = HDF5Storage()
@@ -59,8 +54,11 @@ class _DbInitializer:
             self._storage = HDF5Storage(hdf5_file_path)
             self._alembic_util = _AlembicUtil(self._engine)
             if creating_new:
-                self.print_project_created(path)
+                self._print_project_created(path)
 
+    def init_db(self) -> Tuple[sqlalchemy.engine.Engine, HDF5Storage]:
+        """If the database is empty, initializes it with the most up to date schema.
+        If the database is not empty, ensures that is up to date."""
         if self._db_is_empty():
             Base.metadata.create_all(self._engine)
             self._alembic_util.stamp_head()
@@ -74,7 +72,16 @@ class _DbInitializer:
                 )
         return self._engine, self._storage
 
-    def _validate_path(self, path):
+    @staticmethod
+    def _print_project_created(path):
+        print(
+            f"New Entropy project '{project_name(path)}' created at '{project_path(path)}'"
+        )
+
+    @staticmethod
+    def _validate_path(path):
+        if path is None or path == _SQL_ALCHEMY_MEMORY:
+            return
         if path is not None and Path(path).suffix == ".db":
             logger.error(
                 "_DbInitializer provided with path to a sqlite database. This is deprecated."
@@ -97,11 +104,6 @@ class _DbInitializer:
                 "expects the path to an Entropy project folder"
             )
 
-    # TODO: Move to _DbUpgrader class
-    @staticmethod
-    def upgrade_db(path: str, echo=False):
-        _DbUpgrader(path, echo).upgrade_db()
-
     def _db_is_empty(self) -> bool:
         cursor = self._engine.execute(
             "SELECT sql FROM sqlite_master WHERE type = 'table'"
@@ -111,27 +113,54 @@ class _DbInitializer:
 
 class _DbUpgrader:
     def __init__(self, path: str, echo=False) -> None:
-        if path is None or path == _SQL_ALCHEMY_MEMORY:
-            logger.debug("_DbInitializer is in in-memory mode")
-            self._storage = HDF5Storage()
-            self._engine = create_engine("sqlite:///" + _SQL_ALCHEMY_MEMORY, echo=echo)
-        else:
-            logger.debug("_DbInitializer is in project directory mode")
-            entropy_dir_path = os.path.join(path, _ENTROPY_DIRNAME)
-            db_file_path = os.path.join(entropy_dir_path, _DB_FILENAME)
-            hdf5_file_path = os.path.join(entropy_dir_path, _HDF5_FILENAME)
-            self._engine = create_engine("sqlite:///" + db_file_path, echo=echo)
-            self._storage = HDF5Storage(hdf5_file_path)
-        self._alembic_util = _AlembicUtil(self._engine)
+        self._path = path
+        self._echo = echo
+        self._engine = None
+        self._storage = None
+        self._alembic_util = None
 
     def upgrade_db(self) -> None:
-        self._convert_to_project()
+        if self._path is None or self._path == _SQL_ALCHEMY_MEMORY:
+            logger.debug("_DbUpgrader is in in-memory mode")
+            self._storage = HDF5Storage()
+            self._engine = create_engine(
+                "sqlite:///" + _SQL_ALCHEMY_MEMORY, echo=self._echo
+            )
+        else:
+            logger.debug("_DbUpgrader is in project directory mode")
+            if not os.path.exists(self._path):
+                raise EntropyError(f"No Entropy project exists at '{self._path}'")
+            if self._path_is_to_db():
+                self._convert_to_project()
+            entropy_dir_path = os.path.join(self._path, _ENTROPY_DIRNAME)
+            db_file_path = os.path.join(entropy_dir_path, _DB_FILENAME)
+            hdf5_file_path = os.path.join(entropy_dir_path, _HDF5_FILENAME)
+            self._engine = create_engine("sqlite:///" + db_file_path, echo=self._echo)
+            self._storage = HDF5Storage(hdf5_file_path)
+        self._alembic_util = _AlembicUtil(self._engine)
         self._alembic_util.upgrade()
         self._migrate_results_to_hdf5()
         self._migrate_metadata_to_hdf5()
 
+    def _path_doesnt_exist(self):
+        return not os.path.isdir(self._path) and not os.path.isfile(self._path)
+
+    def _path_is_to_db(self):
+        return (
+            self._path is not None
+            and (Path(self._path).suffix == ".db")
+            or os.path.isfile(self._path)
+        )
+
     def _convert_to_project(self):
-        pass  # TODO: !!!
+        project_dir_path = os.path.splitext(self._path)[0]
+        entropy_dir_path = os.path.join(project_dir_path, _ENTROPY_DIRNAME)
+        db_file_path = os.path.join(entropy_dir_path, _DB_FILENAME)
+        hdf5_file_path = os.path.join(entropy_dir_path, _HDF5_FILENAME)
+        os.makedirs(entropy_dir_path, exist_ok=True)
+        shutil.move(self._path, db_file_path)
+        shutil.move(self._path.replace(".db", ".hdf5"), hdf5_file_path)
+        self._path = project_dir_path
 
     def _migrate_results_to_hdf5(self) -> None:
         self._migrate_rows_to_hdf5(EntityType.RESULT, ResultTable)

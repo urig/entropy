@@ -1,13 +1,14 @@
 import os
 
+import pytest
 from sqlalchemy import create_engine
 
 from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
 from entropylab.api.data_writer import Metadata
+from entropylab.api.errors import EntropyError
 from entropylab.results_backend.sqlalchemy.storage import HDF5Storage
 from entropylab.results_backend.sqlalchemy.db_initializer import (
-    _DbInitializer,
     _ENTROPY_DIRNAME,
     _HDF5_FILENAME,
     _DbUpgrader,
@@ -15,16 +16,43 @@ from entropylab.results_backend.sqlalchemy.db_initializer import (
 from entropylab.results_backend.sqlalchemy.tests.test_utils import (
     delete_if_exists,
     create_test_project,
+    build_project_dir_path_for_test,
 )
+
+
+def test_upgrade_db_when_path_to_project_does_not_exist(request):
+    # arrange
+    test_project_dir = build_project_dir_path_for_test(request)
+    try:
+        target = _DbUpgrader(test_project_dir, echo=False)
+        # act & assert
+        with pytest.raises(EntropyError):
+            target.upgrade_db()
+    finally:
+        # clean up
+        delete_if_exists(test_project_dir)
+
+
+def test_upgrade_db_when_path_to_db_file_does_not_exist(request):
+    # arrange
+    test_db_file = build_project_dir_path_for_test(request) + ".db"
+    try:
+        target = _DbUpgrader(test_db_file, echo=False)
+        # act & assert
+        with pytest.raises(EntropyError):
+            target.upgrade_db()
+    finally:
+        # clean up
+        delete_if_exists(test_db_file)
 
 
 def test_upgrade_db_when_initial_db_is_empty(request):
     # arrange
     test_project_dir = create_test_project(request, f"./db_templates/initial.db")
     try:
-        target = _DbInitializer()
+        target = _DbUpgrader(test_project_dir, echo=False)
         # act
-        target.upgrade_db(test_project_dir, echo=False)
+        target.upgrade_db()
         # assert
         cur = create_engine(
             f"sqlite:///{test_project_dir}/.entropy/entropy.db"
@@ -40,10 +68,9 @@ def test_upgrade_db_when_initial_db_is_empty(request):
 def test_upgrade_db_when_db_is_in_memory():
     try:
         # arrange
-        target = _DbInitializer()
-        target.init_db(":memory:", echo=True)
+        target = _DbUpgrader(":memory:", echo=True)
         # act
-        target.upgrade_db(":memory:", echo=True)
+        target.upgrade_db()
         # assert
         cur = target._engine.execute(
             "SELECT sql FROM sqlite_master WHERE name = 'Results'"
@@ -71,7 +98,7 @@ def test__migrate_results_to_hdf5(request):
         # target = _DbInitializer(test_project_dir, echo=True)
         target = _DbUpgrader(test_project_dir, echo=True)
         # act
-        target._migrate_results_to_hdf5()
+        target.upgrade_db()
         # assert
         storage = HDF5Storage(
             os.path.join(test_project_dir, _ENTROPY_DIRNAME, _HDF5_FILENAME)
@@ -99,7 +126,7 @@ def test__migrate_metadata_to_hdf5(request):
         db.save_metadata(3, Metadata(stage=1, label="ooh", data="aah"))
         target = _DbUpgrader(test_project_dir, echo=True)
         # act
-        target._migrate_metadata_to_hdf5()
+        target.upgrade_db()
         # assert
         storage = HDF5Storage(
             os.path.join(test_project_dir, _ENTROPY_DIRNAME, _HDF5_FILENAME)

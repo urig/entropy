@@ -70,7 +70,7 @@ class SqlAlchemyDB(DataWriter, DataReader, PersistentLabDB):
         """
         super(SqlAlchemyDB, self).__init__()
         self._enable_hdf5_storage = kwargs.get("enable_hdf5_storage")
-        self._engine, self._storage = _DbInitializer().init_db(path, echo=echo)
+        self._engine, self._storage = _DbInitializer(path, echo=echo).init_db()
         self._Session = sessionmaker(bind=self._engine)
 
     def save_experiment_initial_data(self, initial_data: ExperimentInitialData) -> int:
