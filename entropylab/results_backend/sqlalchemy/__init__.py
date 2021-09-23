@@ -15,4 +15,4 @@ def upgrade_db(path: str):
 
     :param path: The path to the SQLite database to be upgraded
     """
-    _DbInitializer(path).upgrade_db()
+    _DbInitializer().init_db(path).upgrade_db()

@@ -1,4 +1,7 @@
 import os
+
+from sqlalchemy import create_engine
+
 from config import settings
 from entropylab import SqlAlchemyDB, RawResultData
 from entropylab.api.data_writer import Metadata
@@ -7,6 +10,7 @@ from entropylab.results_backend.sqlalchemy.db_initializer import (
     _DbInitializer,
     _ENTROPY_DIRNAME,
     _HDF5_FILENAME,
+    _DbUpgrader,
 )
 from entropylab.results_backend.sqlalchemy.tests.test_utils import (
     delete_if_exists,
@@ -18,13 +22,13 @@ def test_upgrade_db_when_initial_db_is_empty(request):
     # arrange
     test_project_dir = create_test_project(request, f"./db_templates/initial.db")
     try:
-        target = _DbInitializer(test_project_dir, echo=False)
+        target = _DbInitializer()
         # act
-        target.upgrade_db()
+        target.upgrade_db(test_project_dir, echo=False)
         # assert
-        cur = target._engine.execute(
-            "SELECT sql FROM sqlite_master WHERE name = 'Results'"
-        )
+        cur = create_engine(
+            f"sqlite:///{test_project_dir}/.entropy/entropy.db"
+        ).execute("SELECT sql FROM sqlite_master WHERE name = 'Results'")
         res = cur.fetchone()
         cur.close()
         assert "saved_in_hdf5" in res[0]
@@ -36,9 +40,10 @@ def test_upgrade_db_when_initial_db_is_empty(request):
 def test_upgrade_db_when_db_is_in_memory():
     try:
         # arrange
-        target = _DbInitializer(":memory:", echo=True)
+        target = _DbInitializer()
+        target.init_db(":memory:", echo=True)
         # act
-        target.upgrade_db()
+        target.upgrade_db(":memory:", echo=True)
         # assert
         cur = target._engine.execute(
             "SELECT sql FROM sqlite_master WHERE name = 'Results'"
@@ -63,7 +68,8 @@ def test__migrate_results_to_hdf5(request):
         db.save_result(1, RawResultData(stage=2, label="biz", data="bez"))
         db.save_result(2, RawResultData(stage=1, label="bat", data="bot"))
         db.save_result(3, RawResultData(stage=1, label="ooh", data="aah"))
-        target = _DbInitializer(test_project_dir, echo=True)
+        # target = _DbInitializer(test_project_dir, echo=True)
+        target = _DbUpgrader(test_project_dir, echo=True)
         # act
         target._migrate_results_to_hdf5()
         # assert
@@ -91,7 +97,7 @@ def test__migrate_metadata_to_hdf5(request):
         db.save_metadata(1, Metadata(stage=2, label="biz", data="bez"))
         db.save_metadata(2, Metadata(stage=1, label="bat", data="bot"))
         db.save_metadata(3, Metadata(stage=1, label="ooh", data="aah"))
-        target = _DbInitializer(test_project_dir, echo=True)
+        target = _DbUpgrader(test_project_dir, echo=True)
         # act
         target._migrate_metadata_to_hdf5()
         # assert
