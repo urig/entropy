@@ -153,14 +153,24 @@ class _DbUpgrader:
         )
 
     def _convert_to_project(self):
-        project_dir_path = os.path.splitext(self._path)[0]
-        entropy_dir_path = os.path.join(project_dir_path, _ENTROPY_DIRNAME)
-        db_file_path = os.path.join(entropy_dir_path, _DB_FILENAME)
-        hdf5_file_path = os.path.join(entropy_dir_path, _HDF5_FILENAME)
-        os.makedirs(entropy_dir_path, exist_ok=True)
-        shutil.move(self._path, db_file_path)
-        shutil.move(self._path.replace(".db", ".hdf5"), hdf5_file_path)
-        self._path = project_dir_path
+        # old
+        old_db_file_path = self._path
+        old_hdf5_file_path = old_db_file_path.replace(".db", ".hdf5")
+        # new
+        new_project_dir_path = os.path.splitext(old_db_file_path)[0]
+        new_entropy_dir_path = os.path.join(new_project_dir_path, _ENTROPY_DIRNAME)
+        new_db_file_path = os.path.join(new_entropy_dir_path, _DB_FILENAME)
+        new_hdf5_file_path = os.path.join(new_entropy_dir_path, _HDF5_FILENAME)
+        # convert
+        os.makedirs(new_entropy_dir_path, exist_ok=True)
+        shutil.move(old_db_file_path, new_db_file_path)
+        if os.path.exists(old_hdf5_file_path):
+            shutil.move(old_hdf5_file_path, new_hdf5_file_path)
+        self._path = new_project_dir_path
+        print(
+            f"Converted db file at {old_db_file_path} to project directory "
+            f"at {new_project_dir_path}"
+        )
 
     def _migrate_results_to_hdf5(self) -> None:
         self._migrate_rows_to_hdf5(EntityType.RESULT, ResultTable)
