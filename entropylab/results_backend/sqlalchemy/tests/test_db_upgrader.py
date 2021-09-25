@@ -17,6 +17,7 @@ from entropylab.results_backend.sqlalchemy.tests.test_utils import (
     delete_if_exists,
     create_test_project,
     build_project_dir_path_for_test,
+    copy_db_template,
 )
 
 
@@ -46,6 +47,26 @@ def test_upgrade_db_when_path_to_db_file_does_not_exist(request):
         delete_if_exists(test_db_file)
 
 
+def test_upgrade_db_assert_db_file_is_converted_to_project_dir(request):
+    # arrange
+    expected_project_dir = build_project_dir_path_for_test(request)
+    test_db_file = expected_project_dir + ".db"
+    copy_db_template("db_templates/with_saved_in_hdf5_col.db", test_db_file, request)
+    try:
+        target = _DbUpgrader(test_db_file, echo=False)
+        # act
+        target.upgrade_db()
+        # assert
+        assert not os.path.exists(test_db_file)
+        assert os.path.exists(
+            os.path.join(expected_project_dir, ".entropy", "entropy.db")
+        )
+    finally:
+        # clean up
+        delete_if_exists(expected_project_dir)
+        delete_if_exists(test_db_file)
+
+
 def test_upgrade_db_when_initial_db_is_empty(request):
     # arrange
     test_project_dir = create_test_project(request, f"./db_templates/initial.db")
@@ -62,7 +83,8 @@ def test_upgrade_db_when_initial_db_is_empty(request):
         assert "saved_in_hdf5" in res[0]
     finally:
         # clean up
-        delete_if_exists(test_project_dir)
+        # delete_if_exists(test_project_dir)
+        pass
 
 
 def test_upgrade_db_when_db_is_in_memory():
