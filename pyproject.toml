@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "entropylab"
-version = "0.2.0"
+version = "0.3.0-alpha1"
 description = ""
 license = "BSD-3-Clause"
 authors = [
@@ -21,6 +21,10 @@ exclude = [
 ]
 readme = "README.md"
 homepage = "https://github.com/entropy-lab/entropy"
+
+[tool.poetry.scripts]
+entropy = 'entropylab.cli.main:main'
+n3p = 'entropylab.cli.main:main'
 
 [tool.poetry.dependencies]
 python = "^3.7.1"
@@ -45,7 +49,7 @@ black = "^20.8b1"
 flake8 = "^3.9.0"
 flake8-bugbear = "^21.3.2"
 pytest-repeat = "^0.9.1"
-pytest-cov = "^2.11.1"
+pytest-cov = "^3.0.0"
 poethepoet = "^0.10.0"
 
 [tool.pytest.ini_options]
