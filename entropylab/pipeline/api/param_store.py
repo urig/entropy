@@ -66,7 +66,7 @@ class ParamStore(ABC, MutableMapping):
         pass
 
     @abstractmethod
-    def commit(self, label):
+    def commit(self, label: Optional[str] = None):
         pass
 
     @abstractmethod
