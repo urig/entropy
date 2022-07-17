@@ -138,4 +138,4 @@ class ParamStore(ParamStoreABC):
 
     @property
     def is_dirty(self):
-        raise NotImplementedError()
+        return False

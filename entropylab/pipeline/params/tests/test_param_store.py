@@ -19,12 +19,13 @@ from entropylab.pipeline.api.in_process_param_store import (
     fix_param_qualified_name,
 )
 from entropylab.pipeline.api.param_store import Param, LOCAL_TZ, _ns_to_datetime
+from entropylab.pipeline.api.param_store import ParamStore as ParamStoreABC
+from entropylab.pipeline.params.postgres.param_store import ParamStore
 
 """ ctor """
 
 
-def test_ctor_when_store_is_empty_then_is_dirty_is_false():
-    target = InProcessParamStore()
+def test_ctor_when_store_is_empty_then_is_dirty_is_false(target):
     assert target.is_dirty is False
 
 
@@ -1141,7 +1142,9 @@ def test_demo(tinydb_file_path):
 
 def test_migrate_param_store_0_1_to_0_2(tinydb_file_path, request):
     # arrange
-    _copy_template("migrate_param_store_0_1_to_0_2.json", tinydb_file_path, request)
+    _copy_template(
+        "../../tests/migrate_param_store_0_1_to_0_2.json", tinydb_file_path, request
+    )
     # act
     migrate_param_store_0_1_to_0_2(tinydb_file_path, "test_param_store.py")
     # assert
@@ -1163,7 +1166,9 @@ def test_migrate_param_store_0_1_to_0_2(tinydb_file_path, request):
 
 def test_fix_param_qualified_name(tinydb_file_path, request):
     # arrange
-    _copy_template("fix_param_qualified_name.json", tinydb_file_path, request)
+    _copy_template(
+        "../../tests/fix_param_qualified_name.json", tinydb_file_path, request
+    )
     # act
     fix_param_qualified_name(tinydb_file_path, "test_param_store.py")
     # assert
@@ -1242,3 +1247,25 @@ def test__ns_to_datetime():
     expected = pd.Timestamp("2022-07-10 11:40:37.233137200+0300", tz=LOCAL_TZ)
     actual = _ns_to_datetime(1657442437233137200)
     assert actual == expected
+
+
+""" Test fixture """
+
+
+@pytest.fixture(
+    params=[
+        "InProcessParamStore in-memory",
+        "InProcessParamStore JSON file",
+        "ParamStore PostgreSQL DB",
+    ],
+)
+def target(request, tmp_path) -> ParamStoreABC:
+    if request.param == "InProcessParamStore in-memory":
+        yield InProcessParamStore()
+    elif request.param == "InProcessParamStore JSON file":
+        file_path = tmp_path / "tiny_db.json"
+        yield InProcessParamStore(file_path)
+    else:
+        yield ParamStore(
+            "postgresql://test_param_store:kf7yFdNYVjtQQ9H6j5QB@localhost/paramstore1"
+        )
