@@ -3,9 +3,11 @@ from datetime import datetime
 from datetime import timedelta
 from pprint import pprint
 from time import sleep
+from typing import Callable
 
 import pandas as pd
 import pytest
+from sqlalchemy import create_engine
 from tinydb import Query, TinyDB
 
 from entropylab.conftest import _copy_template, Process
@@ -20,6 +22,7 @@ from entropylab.pipeline.api.in_process_param_store import (
 )
 from entropylab.pipeline.api.param_store import Param, LOCAL_TZ, _ns_to_datetime
 from entropylab.pipeline.api.param_store import ParamStore as ParamStoreABC
+from entropylab.pipeline.params.postgres.model import Base
 from entropylab.pipeline.params.postgres.param_store import ParamStore
 
 """ ctor """
@@ -29,15 +32,15 @@ def test_ctor_when_store_is_empty_then_is_dirty_is_false(target):
     assert target.is_dirty is False
 
 
-def test_ctor_when_store_is_empty_then_latest_commit_is_checked_out(tinydb_file_path):
+def test_ctor_checks_out_latest_commit(create_target):
     # arrange
-    with InProcessParamStore(tinydb_file_path) as param_store:
-        param_store.foo = "bar"
+    with create_target() as param_store:
+        param_store["foo"] = "bar"
         param_store.commit()
     # act
-    target = InProcessParamStore(tinydb_file_path)
+    target = create_target()
     # assert
-    assert target.foo == "bar"
+    assert target["foo"] == "bar"
 
 
 """ MutableMapping """

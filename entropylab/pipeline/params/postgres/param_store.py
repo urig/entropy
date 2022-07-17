@@ -36,6 +36,12 @@ class ParamStore(ParamStoreABC):
             )
         )
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.__session_maker.close_all()
+
     def __setitem__(self, key: str, value: Any) -> None:
         with self.__lock:
             self.__params.__setitem__(key, Param(value))
@@ -86,7 +92,7 @@ class ParamStore(ParamStoreABC):
             with self.__session_maker() as session:
                 session.add(commit)
                 session.commit()
-                return commit.commit_id
+                return commit.id
             # doc = self.__build_document(commit_id, label)
             # with self.__filelock:
             #     doc.doc_id = self.__next_doc_id()
