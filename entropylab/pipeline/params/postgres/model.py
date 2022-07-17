@@ -10,7 +10,7 @@ Base = declarative_base()
 
 
 class UtcNow(expression.FunctionElement):
-    """SqlAlchemy function to generate UTC timestamp on server-side (Postgres)
+    """SqlAlchemy function to generate UTC timestamp on the server-side (Postgres)
     Source: https://docs.sqlalchemy.org/en/14/core/compiler.html#utc-timestamp-function
     """
 

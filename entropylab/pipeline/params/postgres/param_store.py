@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import threading
-import time
 from datetime import timedelta
 from pathlib import Path
 from typing import Iterator, List, Optional, Dict, Any
 
+import jsonpickle
 import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from entropylab.pipeline.api.param_store import MergeStrategy, Param
 from entropylab.pipeline.api.param_store import ParamStore as ParamStoreABC
@@ -18,7 +20,7 @@ class ParamStore(ParamStoreABC):
 
     def __init__(
         self,
-        path: Optional[str] | Optional[Path] = None,
+        url: Optional[str] | Optional[Path] = None,
         theirs: Optional[Dict | ParamStore] = None,
         merge_strategy: Optional[MergeStrategy] = MergeStrategy.THEIRS,
     ):
@@ -26,6 +28,13 @@ class ParamStore(ParamStoreABC):
 
         self.__lock = threading.RLock()
         self.__params: Dict[str, Param] = dict()  # where current params are stored
+        self.__session_maker = sessionmaker(
+            bind=create_engine(
+                url,
+                json_serializer=jsonpickle.encode,
+                json_deserializer=jsonpickle.decode,
+            )
+        )
 
     def __setitem__(self, key: str, value: Any) -> None:
         with self.__lock:
@@ -68,9 +77,16 @@ class ParamStore(ParamStoreABC):
             # if not self.__is_dirty:
             #     return self.__base_commit_id
             # commit_id = self.__generate_commit_id()
-            commit_timestamp = time.time_ns()  # nanoseconds since epoch
-            commit = Commit(timestamp=time.time_ns())
             # self.__stamp_dirty_params_with_commit(commit_id, commit_timestamp)
+            commit = Commit(
+                params=self.__params,
+                label=label,
+                tags=None,  # TODO: Save self.__tags here
+            )
+            with self.__session_maker() as session:
+                session.add(commit)
+                session.commit()
+                return commit.commit_id
             # doc = self.__build_document(commit_id, label)
             # with self.__filelock:
             #     doc.doc_id = self.__next_doc_id()
