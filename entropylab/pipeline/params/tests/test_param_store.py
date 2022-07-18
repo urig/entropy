@@ -1252,23 +1252,36 @@ def test__ns_to_datetime():
     assert actual == expected
 
 
-""" Test fixture """
+""" Test fixtures """
+
+DB_SQLITE = "DbParamStore with Sqlite DB file"
+TINY_JSON_FILE = "InProcessParamStore with TinyDB JSON file"
+TINY_IN_MEMORY = "InProcessParamStore in-memory"
+
+
+@pytest.fixture()
+def target(create_target) -> Callable[[], ParamStoreABC]:
+    return create_target()
 
 
 @pytest.fixture(
     params=[
-        "InProcessParamStore in-memory",
-        "InProcessParamStore JSON file",
-        "ParamStore PostgreSQL DB",
+        TINY_IN_MEMORY,
+        TINY_JSON_FILE,
+        DB_SQLITE,
     ],
 )
-def target(request, tmp_path) -> ParamStoreABC:
-    if request.param == "InProcessParamStore in-memory":
-        yield InProcessParamStore()
-    elif request.param == "InProcessParamStore JSON file":
+def create_target(request, tmp_path) -> ParamStoreABC:
+    if request.param == TINY_IN_MEMORY:
+        yield lambda: InProcessParamStore()
+    elif request.param == TINY_JSON_FILE:
         file_path = tmp_path / "tiny_db.json"
-        yield InProcessParamStore(file_path)
+        yield lambda: InProcessParamStore(file_path)
     else:
-        yield ParamStore(
-            "postgresql://test_param_store:kf7yFdNYVjtQQ9H6j5QB@localhost/paramstore1"
-        )
+        file_path = tmp_path / "sqlite.db"
+        url = f"sqlite:///{file_path}"
+        engine = create_engine(url)
+        Base.metadata.create_all(engine)
+        yield lambda: ParamStore(url)
+        # "sqlite:///:memory:"
+        # "postgresql://test_param_store:kf7yFdNYVjtQQ9H6j5QB@localhost/paramstore1"
