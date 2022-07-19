@@ -28,6 +28,7 @@ class ParamStore(ParamStoreABC):
 
         self.__lock = threading.RLock()
         self.__params: Dict[str, Param] = dict()  # where current params are stored
+        self.__tags: Dict[str, List[str]] = dict()  # tags that are mapped to keys
         self.__session_maker = sessionmaker(
             bind=create_engine(
                 url,
@@ -71,7 +72,17 @@ class ParamStore(ParamStoreABC):
             return self.__params.__getitem__(key).value
 
     def __delitem__(self, *args, **kwargs):
-        raise NotImplementedError()
+        with self.__lock:
+            key = args[0]
+            self.__params.__delitem__(*args, **kwargs)
+            self.__remove_key_from_tags(key)
+            # self.__is_dirty = True
+            # self.__dirty_keys.add(key)
+
+    def __remove_key_from_tags(self, key: str):
+        for tag in self.__tags:
+            if key in self.__tags[tag]:
+                self.__tags[tag].remove(key)
 
     def __getattr__(self, key):
         try:
@@ -106,11 +117,17 @@ class ParamStore(ParamStoreABC):
         with self.__lock:
             return self.__params.__contains__(key)
 
-    def keys(self):
-        raise NotImplementedError()
+    def __repr__(self):
+        with self.__lock:
+            return f"<ParamStore({self.to_dict().__repr__()})>"
 
-    def to_dict(self):
-        raise NotImplementedError()
+    def keys(self):
+        with self.__lock:
+            return self.__params.keys()
+
+    def to_dict(self) -> Dict:
+        with self.__lock:
+            return _extract_param_values(self.__params)
 
     def get_value(self, key: str, commit_id: Optional[str] = None) -> object:
         raise NotImplementedError()
@@ -212,17 +229,41 @@ class ParamStore(ParamStoreABC):
     ) -> Dict[str, Dict]:
         raise NotImplementedError()
 
+    """ Tags """
+
     def add_tag(self, tag: str, key: str) -> None:
-        raise NotImplementedError()
+        with self.__lock:
+            if key not in self.__params.keys():
+                raise KeyError(f"key '{key}' is not in store")
+            if tag not in self.__tags:
+                self.__tags[tag] = []
+            self.__tags[tag].append(key)
+            # self.__is_dirty = True
 
     def remove_tag(self, tag: str, key: str) -> None:
-        raise NotImplementedError()
+        with self.__lock:
+            if tag not in self.__tags:
+                return
+            if key not in self.__tags[tag]:
+                return
+            self.__tags[tag].remove(key)
+            # self.__is_dirty = True
 
     def list_keys_for_tag(self, tag: str) -> List[str]:
-        raise NotImplementedError()
+        with self.__lock:
+            if tag not in self.__tags:
+                return []
+            else:
+                return self.__tags[tag]
 
     def list_tags_for_key(self, key: str):
-        raise NotImplementedError()
+        tags_for_key = []
+        for item in self.__tags.items():
+            if key in item[1]:
+                tags_for_key.append(item[0])
+        return tags_for_key
+
+    """ Temp """
 
     def save_temp(self) -> None:
         raise NotImplementedError()

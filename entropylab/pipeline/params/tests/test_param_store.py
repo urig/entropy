@@ -111,49 +111,42 @@ def test___setattr___works(target):
     assert target["foo"] == "bar"
 
 
-def test___getitem___when_key_is_present_then_value_is_returned():
-    target = InProcessParamStore()
+def test___getitem___when_key_is_present_then_value_is_returned(target):
     target["foo"] = "bar"
     assert target["foo"] == "bar"
 
 
-def test___getitem___when_key_is_missing_then_keyerror_is_raised():
-    target = InProcessParamStore()
+def test___getitem___when_key_is_missing_then_keyerror_is_raised(target):
     with pytest.raises(KeyError):
         # noinspection PyStatementEffect
         target["foo"]
 
 
-def test___getitem___when_key_is_none_then_keyerror_is_raised():
-    target = InProcessParamStore()
+def test___getitem___when_key_is_none_then_keyerror_is_raised(target):
     with pytest.raises(KeyError):
         # noinspection PyTypeChecker,PyStatementEffect
         target[None]
 
 
-def test___getitem___when_key_starts_with_underscore_then_keyerror_is_raised():
-    target = InProcessParamStore()
+def test___getitem___when_key_starts_with_underscore_then_keyerror_is_raised(target):
     with pytest.raises(KeyError):
         # noinspection PyTypeChecker,PyStatementEffect
         target["_base_doc_id"]
 
 
-def test___setitem___when_key_starts_with_underscore_then_key_can_be_retrieved():
-    target = InProcessParamStore()
+def test___setitem___when_key_starts_with_underscore_then_key_can_be_retrieved(target):
     target["_base_doc_id"] = "bar"
     bar = target["_base_doc_id"]
     assert bar == "bar"
 
 
-def test___setitem___when_key_starts_with_dunder_then_key_is_not_saved_to_db(
-    tinydb_file_path,
-):
-    with InProcessParamStore(tinydb_file_path) as target:
-        target.__foo = "bar"
-        target.foo = "baz"
-        target.commit()
-    with open(tinydb_file_path) as f:
-        assert "__foo" not in f.read()
+def test___setitem___when_key_starts_with_dunder_then_key_is_not_saved_to_db(target):
+    target.__foo = "bar"
+    target.commit()
+    del target.__foo
+    target.checkout()
+    with pytest.raises(AttributeError):
+        target.__foo
 
 
 def test___setitem___when_saving_dict_then_only_entire_dict_is_wrapped_in_param(
@@ -167,15 +160,13 @@ def test___setitem___when_saving_dict_then_only_entire_dict_is_wrapped_in_param(
     assert doc["params"]["foo"] == Param(dict(bar="baz"))
 
 
-def test___delitem__():
-    target = InProcessParamStore()
+def test___delitem__(target):
     target["foo"] = "bar"
     del target["foo"]
     assert "foo" not in target
 
 
-def test___delitem___when_key_is_deleted_then_it_is_removed_from_tags_too():
-    target = InProcessParamStore()
+def test___delitem___when_key_is_deleted_then_it_is_removed_from_tags_too(target):
     target["foo"] = "bar"
     target["goo"] = "baz"
     target.add_tag("tag", "foo")
@@ -185,11 +176,10 @@ def test___delitem___when_key_is_deleted_then_it_is_removed_from_tags_too():
     assert target.list_keys_for_tag("tag") == ["goo"]
 
 
-def test___repr__():
-    target = InProcessParamStore()
+def test___repr__(target):
     target["foo"] = "bar"
     actual = target.__repr__()
-    assert actual == "<InProcessParamStore({'foo': 'bar'})>"
+    assert "{'foo': 'bar'}" in actual
 
 
 """ get() """
