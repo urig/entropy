@@ -44,23 +44,67 @@ class ParamStore(ParamStoreABC):
     def __exit__(self, *args):
         self.__session_maker.close_all()
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        with self.__lock:
-            self.__params.__setitem__(key, Param(value))
+    """ MutableMapping """
 
-    def __delitem__(self, *args, **kwargs):
-        raise NotImplementedError()
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Set self[key] to value. The key-value pair becomes a "param" and
+        can be persisted using `commit()` and retrieved later using
+        `checkout()`.
+
+        Note: Keys should not start with a dunder (`__`). Such keys are not
+        treated as params and are not persisted when `commit()` is called.
+        """
+
+        if key.startswith("__") or key.startswith(f"_{self.__class__.__name__}__"):
+            # keys that are private attributes are not params and are treated
+            # as regular object attributes
+            object.__setattr__(self, key, value)
+        else:
+            with self.__lock:
+                self.__params.__setitem__(key, Param(value))
+                # self.__is_dirty = True
+                # self.__dirty_keys.add(key)
 
     def __getitem__(self, key: str) -> Any:
         with self.__lock:
             return self.__params.__getitem__(key).value
 
+    def __delitem__(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def __getattr__(self, key):
+        try:
+            return object.__getattribute__(self, key)
+        except AttributeError:
+            try:
+                return self[key]
+            except KeyError:
+                raise AttributeError(key)
+
+    def __setattr__(self, key, value):
+        try:
+            object.__getattribute__(self, key)
+        except AttributeError:
+            try:
+                self[key] = value
+            except BaseException:
+                raise AttributeError(key)
+        else:
+            object.__setattr__(self, key, value)
+
+    def __iter__(self) -> Iterator[Any]:
+        with self.__lock:
+            values = _extract_param_values(self.__params)
+            return values.__iter__()
+
     def __len__(self) -> int:
         with self.__lock:
             return self.__params.__len__()
 
-    def __iter__(self) -> Iterator[Any]:
-        raise NotImplementedError()
+    def __contains__(self, key):
+        with self.__lock:
+            return self.__params.__contains__(key)
 
     def keys(self):
         raise NotImplementedError()
@@ -116,13 +160,14 @@ class ParamStore(ParamStoreABC):
             self.__checkout(commit)
 
     def __checkout(self, commit: Commit):
-        self.__params.clear()
-        self.__params.update(commit.params)
-        self.__tags = commit.tags
-        # self.__base_commit_id = commit["metadata"]["id"]
-        # self.__base_doc_id = commit.doc_id
-        # self.__is_dirty = False
-        # self.__dirty_keys.clear()
+        with self.__lock:
+            self.__params.clear()
+            self.__params.update(commit.params)
+            self.__tags = commit.tags
+            # self.__base_commit_id = commit["metadata"]["id"]
+            # self.__base_doc_id = commit.doc_id
+            # self.__is_dirty = False
+            # self.__dirty_keys.clear()
 
     def list_commits(self, label: Optional[str]):
         raise NotImplementedError()
@@ -133,22 +178,24 @@ class ParamStore(ParamStoreABC):
         commit_num: Optional[int] = None,
         move_by: Optional[int] = None,
     ) -> Optional[Commit]:
-        # if commit_id is not None:
-        #     commit = self.__get_commit_by_id(commit_id)
-        # elif commit_num is not None:
-        #     commit = self.__get_commit_by_num(commit_num)
-        # elif move_by is not None:
-        #     commit = self.__get_commit_by_move_by(move_by)
-        # else:
-        #     commit = self.__get_latest_commit()
-        #     return commit
-        commit = self.__get_latest_commit()
-        return commit
+        with self.__lock:
+            # if commit_id is not None:
+            #     commit = self.__get_commit_by_id(commit_id)
+            # elif commit_num is not None:
+            #     commit = self.__get_commit_by_num(commit_num)
+            # elif move_by is not None:
+            #     commit = self.__get_commit_by_move_by(move_by)
+            # else:
+            #     commit = self.__get_latest_commit()
+            #     return commit
+            commit = self.__get_latest_commit()
+            return commit
 
     def __get_latest_commit(self) -> Optional[Commit]:
-        with self.__session_maker() as session:
-            commit = session.query(Commit).order_by(Commit.timestamp.desc()).first()
-            return commit
+        with self.__lock:
+            with self.__session_maker() as session:
+                commit = session.query(Commit).order_by(Commit.timestamp.desc()).first()
+                return commit
 
     def list_values(self, key: str) -> pd.DataFrame:
         raise NotImplementedError()
@@ -186,3 +233,22 @@ class ParamStore(ParamStoreABC):
     @property
     def is_dirty(self):
         return False
+
+
+""" Static helper methods """
+
+
+def _map_dict(f, d: Dict) -> Dict:
+    values_dict = dict()
+    for item in d.items():
+        k = item[0]
+        v = item[1]
+        if not isinstance(v, Param) and isinstance(v, dict):
+            values_dict[k] = _map_dict(f, v)
+        else:
+            values_dict[k] = f(v)
+    return values_dict
+
+
+def _extract_param_values(d: Dict) -> Dict:
+    return _map_dict(lambda x: x.value, d)

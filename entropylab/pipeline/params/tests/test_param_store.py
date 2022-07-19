@@ -82,8 +82,7 @@ def test_ctor_checks_out_latest_commit(create_target):
 """ MutableMapping """
 
 
-def test___iter___works():
-    target = InProcessParamStore()
+def test___iter___works(target):
     target["foo"] = "bar"
     target["baz"] = "buzz"
     actual = iter(target)
@@ -91,27 +90,23 @@ def test___iter___works():
     assert next(actual) == "baz"
 
 
-def test___len___works():
-    target = InProcessParamStore()
+def test___len___works(target):
     target["foo"] = "bar"
     target["baz"] = "buzz"
     assert len(target) == 2
 
 
-def test___contains___works():
-    target = InProcessParamStore()
+def test___contains___works(target):
     target["foo"] = "bar"
     assert "foo" in target
 
 
-def test___getattr___works():
-    target = InProcessParamStore()
+def test___getattr___works(target):
     target["foo"] = "bar"
     assert target.foo == "bar"
 
 
-def test___setattr___works():
-    target = InProcessParamStore()
+def test___setattr___works(target):
     target.foo = "bar"
     assert target["foo"] == "bar"
 
