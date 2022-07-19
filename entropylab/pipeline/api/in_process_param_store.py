@@ -19,8 +19,7 @@ import pandas as pd
 from filelock import FileLock
 from tinydb import TinyDB, Query
 from tinydb.storages import MemoryStorage, Storage
-from tinydb.table import Document
-from tinydb.table import Table
+from tinydb.table import Document, Table
 
 from entropylab.logger import logger
 from entropylab.pipeline.api.errors import EntropyError

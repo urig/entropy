@@ -25,6 +25,41 @@ from entropylab.pipeline.api.param_store import ParamStore as ParamStoreABC
 from entropylab.pipeline.params.postgres.model import Base
 from entropylab.pipeline.params.postgres.param_store import ParamStore
 
+""" Test fixtures """
+
+# The two test fixtures below will provide test targets (ParamStore instances) to any
+# test that requests them. By default, all 3 possible test targets are provided:
+
+DB_SQLITE = "DbParamStore with empty Sqlite DB file"
+TINY_JSON_FILE = "InProcessParamStore with empty TinyDB JSON file"
+TINY_IN_MEMORY = "InProcessParamStore in in-memory mode"
+
+# Alternatively, test authors can pick and choose specific test targets like so:
+# @pytest.mark.parametrize("create_target", [TINY_JSON_FILE, DB_SQLITE], indirect=True)
+
+
+@pytest.fixture()
+def target(create_target) -> Callable[[], ParamStoreABC]:
+    return create_target()
+
+
+@pytest.fixture(params=[TINY_IN_MEMORY, TINY_JSON_FILE, DB_SQLITE])
+def create_target(request, tmp_path) -> ParamStoreABC:
+    if request.param == TINY_IN_MEMORY:
+        yield lambda: InProcessParamStore()
+    elif request.param == TINY_JSON_FILE:
+        file_path = tmp_path / "tiny_db.json"
+        yield lambda: InProcessParamStore(file_path)
+    else:
+        file_path = tmp_path / "sqlite.db"
+        url = f"sqlite:///{file_path}"
+        engine = create_engine(url)
+        Base.metadata.create_all(engine)
+        yield lambda: ParamStore(url)
+        # "sqlite:///:memory:"
+        # "postgresql://test_param_store:kf7yFdNYVjtQQ9H6j5QB@localhost/paramstore1"
+
+
 """ ctor """
 
 
@@ -32,6 +67,7 @@ def test_ctor_when_store_is_empty_then_is_dirty_is_false(target):
     assert target.is_dirty is False
 
 
+@pytest.mark.parametrize("create_target", [TINY_JSON_FILE, DB_SQLITE], indirect=True)
 def test_ctor_checks_out_latest_commit(create_target):
     # arrange
     with create_target() as param_store:
@@ -1250,38 +1286,3 @@ def test__ns_to_datetime():
     expected = pd.Timestamp("2022-07-10 11:40:37.233137200+0300", tz=LOCAL_TZ)
     actual = _ns_to_datetime(1657442437233137200)
     assert actual == expected
-
-
-""" Test fixtures """
-
-DB_SQLITE = "DbParamStore with Sqlite DB file"
-TINY_JSON_FILE = "InProcessParamStore with TinyDB JSON file"
-TINY_IN_MEMORY = "InProcessParamStore in-memory"
-
-
-@pytest.fixture()
-def target(create_target) -> Callable[[], ParamStoreABC]:
-    return create_target()
-
-
-@pytest.fixture(
-    params=[
-        TINY_IN_MEMORY,
-        TINY_JSON_FILE,
-        DB_SQLITE,
-    ],
-)
-def create_target(request, tmp_path) -> ParamStoreABC:
-    if request.param == TINY_IN_MEMORY:
-        yield lambda: InProcessParamStore()
-    elif request.param == TINY_JSON_FILE:
-        file_path = tmp_path / "tiny_db.json"
-        yield lambda: InProcessParamStore(file_path)
-    else:
-        file_path = tmp_path / "sqlite.db"
-        url = f"sqlite:///{file_path}"
-        engine = create_engine(url)
-        Base.metadata.create_all(engine)
-        yield lambda: ParamStore(url)
-        # "sqlite:///:memory:"
-        # "postgresql://test_param_store:kf7yFdNYVjtQQ9H6j5QB@localhost/paramstore1"

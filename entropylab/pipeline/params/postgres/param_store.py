@@ -36,6 +36,8 @@ class ParamStore(ParamStoreABC):
             )
         )
 
+        self.checkout()
+
     def __enter__(self):
         return self
 
@@ -103,11 +105,50 @@ class ParamStore(ParamStoreABC):
             # self.__dirty_keys.clear()
             # return doc["metadata"]["id"]
 
-    def checkout(self, commit_id: str, commit_num: int = None, move_by: int = None):
-        raise NotImplementedError()
+    def checkout(
+        self,
+        commit_id: Optional[str] = None,
+        commit_num: Optional[int] = None,
+        move_by: Optional[int] = None,
+    ) -> None:
+        commit = self.__get_commit(commit_id, commit_num, move_by)
+        if commit:
+            self.__checkout(commit)
+
+    def __checkout(self, commit: Commit):
+        self.__params.clear()
+        self.__params.update(commit.params)
+        self.__tags = commit.tags
+        # self.__base_commit_id = commit["metadata"]["id"]
+        # self.__base_doc_id = commit.doc_id
+        # self.__is_dirty = False
+        # self.__dirty_keys.clear()
 
     def list_commits(self, label: Optional[str]):
         raise NotImplementedError()
+
+    def __get_commit(
+        self,
+        commit_id: Optional[str] = None,
+        commit_num: Optional[int] = None,
+        move_by: Optional[int] = None,
+    ) -> Optional[Commit]:
+        # if commit_id is not None:
+        #     commit = self.__get_commit_by_id(commit_id)
+        # elif commit_num is not None:
+        #     commit = self.__get_commit_by_num(commit_num)
+        # elif move_by is not None:
+        #     commit = self.__get_commit_by_move_by(move_by)
+        # else:
+        #     commit = self.__get_latest_commit()
+        #     return commit
+        commit = self.__get_latest_commit()
+        return commit
+
+    def __get_latest_commit(self) -> Optional[Commit]:
+        with self.__session_maker() as session:
+            commit = session.query(Commit).order_by(Commit.timestamp.desc()).first()
+            return commit
 
     def list_values(self, key: str) -> pd.DataFrame:
         raise NotImplementedError()

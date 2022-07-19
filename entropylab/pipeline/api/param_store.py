@@ -70,7 +70,12 @@ class ParamStore(ABC, MutableMapping):
         pass
 
     @abstractmethod
-    def checkout(self, commit_id: str, commit_num: int = None, move_by: int = None):
+    def checkout(
+        self,
+        commit_id: Optional[str] = None,
+        commit_num: Optional[int] = None,
+        move_by: Optional[int] = None,
+    ) -> None:
         pass
 
     @abstractmethod
