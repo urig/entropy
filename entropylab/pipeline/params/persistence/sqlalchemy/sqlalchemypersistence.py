@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Set, List
 
 import jsonpickle
+import pandas as pd
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
@@ -134,16 +135,31 @@ class SqlAlchemyPersistence(Persistence):
             return commits.all()
 
     def save_temp_commit(self, commit: Commit) -> None:
-        temp_table = TempTable()
-        # TODO: Perhaps create the timestamp here?
-        temp_table.id = TEMP_COMMIT_ID
-        temp_table.timestamp = commit.timestamp
-        temp_table.label = commit.label
-        temp_table.params = commit.params
-        temp_table.tags = commit.tags
         with self.__session_maker() as session:
-            session.add(temp_table)
-            session.commit()
+            record = (
+                session.query(TempTable)
+                .filter(TempTable.id == TEMP_COMMIT_ID)
+                .one_or_none()
+            )
+            if record:
+                record.params = commit.params
+                record.timestamp = pd.Timestamp.now()
+                session.add(record)
+                dirty = session.dirty
+                session.flush()
+                session.commit()
+                x = 0
+            else:
+                temp_table = TempTable()
+                # TODO: Perhaps create the timestamp here?
+                temp_table.id = TEMP_COMMIT_ID
+                temp_table.timestamp = commit.timestamp
+                temp_table.label = commit.label
+                temp_table.params = commit.params
+                temp_table.tags = commit.tags
+                # with self.__session_maker() as session:
+                session.add(temp_table)
+                session.commit()
 
     def load_temp_commit(self) -> Commit:
         with self.__session_maker() as session:

@@ -1060,6 +1060,15 @@ def test_save_temp_and_load_temp(target):
     assert target.foo == "bar"
 
 
+def test_save_temp_twice(target):
+    target.foo = "bar"
+    target.save_temp()
+    target.foo = "baz"
+    target.save_temp()
+    target.load_temp()
+    assert target.foo == "baz"
+
+
 def test_load_temp_when_save_temp_not_called_before_then_error_is_raised(target):
     with pytest.raises(EntropyError):
         target.load_temp()
